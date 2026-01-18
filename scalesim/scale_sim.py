@@ -167,6 +167,14 @@ class scalesim:
             df_string = "Weight Stationary"
         elif df == 'is':
             df_string = "Input Stationary"
+        elif df == 'os_piped':
+            df_string = "Output Stationary piped"
+        elif df == 'ws_piped':
+            df_string = "Weight Stationary piped"
+        elif df == 'is_piped':
+            df_string = "Input Stationary piped"
+        elif df == 'test':
+            df_string = "test"
 
         print("====================================================")
         print("******************* SCALE SIM **********************")

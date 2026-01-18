@@ -13,8 +13,11 @@ from scalesim.topology_utils import topologies as topo
 from scalesim.layout_utils import layouts as layout
 from scalesim.compute.operand_matrix import operand_matrix as opmat
 from scalesim.compute.systolic_compute_os import systolic_compute_os
+from scalesim.compute.systolic_compute_os_piped import systolic_compute_os_piped
 from scalesim.compute.systolic_compute_ws import systolic_compute_ws
+from scalesim.compute.systolic_compute_ws_piped import systolic_compute_ws_piped
 from scalesim.compute.systolic_compute_is import systolic_compute_is
+from scalesim.compute.systolic_compute_is_piped import systolic_compute_is_piped
 from scalesim.memory.double_buffered_scratchpad_mem import double_buffered_scratchpad as mem_dbsp
 
 class single_layer_sim:
@@ -128,6 +131,8 @@ class single_layer_sim:
             self.compute_system = systolic_compute_ws()
         elif self.dataflow == 'is':
             self.compute_system = systolic_compute_is()
+        elif self.dataflow == 'os_piped':
+            self.compute_system = systolic_compute_os_piped()
 
         arr_dims = self.config.get_array_dims()
         self.using_ifmap_custom_layout = self.config.using_ifmap_custom_layout

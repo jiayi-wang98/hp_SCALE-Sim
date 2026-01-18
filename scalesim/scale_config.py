@@ -47,7 +47,7 @@ class scale_config:
         self.filter_sram_bank_num = 10
         self.filter_sram_bank_port = 2
 
-        self.valid_df_list = ['os', 'ws', 'is']
+        self.valid_df_list = ['os', 'ws', 'is', 'os_piped', 'ws_piped', 'is_piped', 'test']
 
         self.sparsity_support = False
         self.sparsity_representation = ""
