@@ -193,6 +193,8 @@ class systolic_compute_is:
 
     #
     def create_demand_matrices(self):
+        # debug
+        print("[DBG is]")
         """
         Method to create IFAMP, Filter and OFMAP demand matrices from the operand matrices. They
         contain several folds of IFAMP, Filter and OFMAP demands. The folding happens because

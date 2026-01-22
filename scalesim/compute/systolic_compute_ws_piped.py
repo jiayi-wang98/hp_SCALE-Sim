@@ -1,8 +1,6 @@
 """
-This module implements the 'systolic_compute_is' class, which simulates a systolic array with Weight
-Stationary (WS) dataflow. It handles operand prefetching, demand matrix creation, and performance
-metrics such as mapping efficiency and compute utilization. It also tracks read and write requests
-for IFMAP, Filter, and OFMAP operations.
+systolic_compute_ws_piped
+ws piped
 """
 
 import math
@@ -10,6 +8,7 @@ import numpy as np
 from tqdm import tqdm
 from scalesim.scale_config import scale_config as cfg
 from scalesim.compute.compression import compression as cp
+skew_factor = 3
 
 class systolic_compute_ws_piped:
     """
@@ -209,6 +208,8 @@ class systolic_compute_ws_piped:
 
     #
     def create_demand_matrices(self):
+        # debug
+        print("[DBG ws piped]")
         """
         Method to create ifmap, filter and ofmap demand matrices from the operand matrices. They
         contain several folds of ifmap, filter and ofmap demands. The folding happens because
@@ -220,21 +221,6 @@ class systolic_compute_ws_piped:
         self.create_ifmap_demand_mat()
         self.create_filter_demand_mat()
         self.create_ofmap_demand_mat()   
-
-        # mod for overlap
-        maxT = max(self.ifmap_demand_matrix.shape[0],
-            self.filter_demand_matrix.shape[0],
-            self.ofmap_demand_matrix.shape[0])
-        def pad_rows(mat, target):
-            if mat.shape[0] == target:
-                return mat
-            pad = np.ones((target - mat.shape[0], mat.shape[1]),
-                          dtype=mat.dtype) * -1
-            return np.vstack([mat, pad])
-        self.ifmap_demand_matrix = pad_rows(self.ifmap_demand_matrix, maxT)
-        self.filter_demand_matrix = pad_rows(self.filter_demand_matrix, maxT)
-        self.ofmap_demand_matrix  = pad_rows(self.ofmap_demand_matrix,  maxT)
-
 
         # assert self.ifmap_demand_matrix.shape[0] == self.filter_demand_matrix.shape[0], \
         #        'IFMAP and Filter demands out of sync'
@@ -320,10 +306,9 @@ class systolic_compute_ws_piped:
                             constant_values=-1
                         )
 
-                # mod for overlap
                 # Account for the cycles for weights to load
-                # this_fold_demand = np.concatenate((inter_fold_gap_prefix_mat, this_fold_demand),
-                #                                   axis=0)
+                this_fold_demand = np.concatenate((inter_fold_gap_prefix_mat, this_fold_demand),
+                                                  axis=0)
 
                 # Account for the cycles for final output to drain out
                 if self.config.sparsity_support and self.config.sparsity_optimized_mapping:
@@ -333,24 +318,16 @@ class systolic_compute_ws_piped:
                             ((0, 0), (0, this_fold_demand.shape[1] - inter_fold_gap_suffix_mat.shape[1])),  # Pad only columns, not rows
                             constant_values=-1
                         )
-                #this_fold_demand = np.concatenate((this_fold_demand, inter_fold_gap_suffix_mat),
-                #                                  axis=0)                
+                this_fold_demand = np.concatenate((this_fold_demand, inter_fold_gap_suffix_mat),
+                                                  axis=0)                
 
                 # Add skew to the IFMAP demand matrix to reflect systolic pipeline fill
                 if not self.config.sparsity_optimized_mapping:
-                    this_fold_demand = skew_matrix(this_fold_demand)
+                    this_fold_demand = skew_matrix(this_fold_demand,skew_factor)
 
                 ifmap_demand_matrix_list.append(this_fold_demand)
-        
-        # mod for overlap
-        # self.ifmap_demand_matrix = np.concatenate(ifmap_demand_matrix_list)
-        full_demand = None
-        for this_fold_demand in ifmap_demand_matrix_list:
-            overlap = this_fold_demand.shape[1] - 1
-            full_demand = overlap_concat(full_demand, this_fold_demand, overlap)
 
-        self.ifmap_demand_matrix = full_demand
-
+        self.ifmap_demand_matrix = np.concatenate(ifmap_demand_matrix_list)
 
         if False:
             if self.config.sparsity_support is True:
@@ -411,11 +388,19 @@ class systolic_compute_ws_piped:
 
                 sum_sparse = sum(list(row).count(-1) for row in this_fold_demand)
 
-                # mod for overlap
+                # mod for piped
                 # Time for inputs to stream and the partial sums to drain out
                 # this_fold_demand = np.concatenate((this_fold_demand, inter_fold_gap_suffix_mat),
                 #                                  axis=0)
-
+                base_height = self.arr_row + self.T + (self.arr_col - 1)
+                skew_overhead = (self.arr_row - 1) * skew_factor
+                total_target_cycles = base_height + skew_overhead
+                current_height = this_fold_demand.shape[0]
+                needed_suffix_rows = total_target_cycles - current_height    
+                if needed_suffix_rows > 0:
+                    suffix_mat = np.ones((needed_suffix_rows, this_fold_demand.shape[1])) * -1
+                    this_fold_demand = np.concatenate((this_fold_demand, suffix_mat), axis=0) 
+                #mod end          
 
                 # Calculate the mapping efficiency
                 row_used = min(self.arr_row, row_end_idx - row_start_id)
@@ -440,15 +425,8 @@ class systolic_compute_ws_piped:
                 #else:
                 #    self.filter_demand_matrix = \
                 #       np.concatenate((self.filter_demand_matrix, this_fold_demand), axis=0)
-        # mod for overlap
-        # self.filter_demand_matrix = np.concatenate(filter_demand_matrix_list)
-        full_demand = None
-        for this_fold_demand in filter_demand_matrix_list:
-            overlap = this_fold_demand.shape[1] - 1
-            full_demand = overlap_concat(full_demand, this_fold_demand, overlap)
-
-        self.filter_demand_matrix = full_demand
-
+        
+        self.filter_demand_matrix = np.concatenate(filter_demand_matrix_list)
 
         if False:
             if self.config.sparsity_support is True:
@@ -502,7 +480,7 @@ class systolic_compute_ws_piped:
                                                   axis=0)
 
                 # Add skew to the OFMAP demand matrix to reflect systolic pipeline fill
-                this_fold_demand = skew_matrix(this_fold_demand)
+                this_fold_demand = skew_matrix(this_fold_demand, skew_factor)
 
                 ofmap_demand_matrix_list.append(this_fold_demand)
                 #if fr == 0 and fc == 0:
@@ -511,16 +489,7 @@ class systolic_compute_ws_piped:
                 #    self.ofmap_demand_matrix = \
                 #       np.concatenate((self.ofmap_demand_matrix, this_fold_demand), axis=0)
 
-
-        # mode for overlap
-        # self.ofmap_demand_matrix = np.concatenate(ofmap_demand_matrix_list)
-        full_demand = None
-        for this_fold_demand in ofmap_demand_matrix_list:
-            overlap = this_fold_demand.shape[1] - 1
-            full_demand = overlap_concat(full_demand, this_fold_demand, overlap)
-
-        self.ofmap_demand_matrix = full_demand
-
+        self.ofmap_demand_matrix = np.concatenate(ofmap_demand_matrix_list)
 
         if False:
             if self.config.sparsity_support is True:
@@ -652,9 +621,10 @@ class systolic_compute_ws_piped:
         return self.ofmap_writes
 
 
-#
+#    
+"""
 def skew_matrix(input_matrix_np):
-    """
+
     Method to add skew to the input matix to maintain systolic array flow.
     Example:
         Input matrix:
@@ -664,7 +634,7 @@ def skew_matrix(input_matrix_np):
             1 1 1
           1 1 1
         1 1 1
-    """
+
     rows, cols = input_matrix_np.shape
 
     out_matrix_np = np.full((rows + cols - 1, cols), -1, dtype=input_matrix_np.dtype)
@@ -673,6 +643,27 @@ def skew_matrix(input_matrix_np):
         out_matrix_np[c:c + rows, c] = input_matrix_np[:, c]
 
     return out_matrix_np
+"""
+
+
+def skew_matrix(input_matrix_np, skew_factor):
+    """
+    Add skew to the input matrix to maintain systolic array flow.
+    skew_factor = 3: stagger columns by 3 cycles
+    """
+    rows, cols = input_matrix_np.shape
+
+    # total cycles = rows + (cols-1)*skew_factor
+    out_rows = rows + (cols - 1) * skew_factor
+    out_matrix_np = np.full((out_rows, cols), -1, dtype=input_matrix_np.dtype)
+
+    for c in range(cols):
+        start = c * skew_factor
+        out_matrix_np[start:start + rows, c] = input_matrix_np[:, c]
+
+    return out_matrix_np
+
+
 
 #
 def skew_matrix_row_sparsity(input_matrix, arr_row, block_size):
@@ -714,21 +705,3 @@ def skew_matrix_row_sparsity(input_matrix, arr_row, block_size):
         output_matrix.append(row)
     
     return np.array(output_matrix, dtype=input_matrix.dtype)
-
-# mod for overlap
-def overlap_concat(prev, nxt, overlap):
-    """
-    prev, nxt: 2D numpy arrays with -1 as null.
-    overlap: number of rows to overlap (typically cols - 1 after skew)
-    """
-    if prev is None:
-        return nxt
-
-    assert prev.shape[1] == nxt.shape[1]
-
-    tail = prev[-overlap:, :]
-    head = nxt[:overlap, :]
-
-    merged = np.where(head != -1, head, tail)
-    return np.vstack([prev[:-overlap, :], merged, nxt[overlap:, :]])
-

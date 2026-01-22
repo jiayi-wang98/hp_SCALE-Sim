@@ -1,8 +1,6 @@
 """
-This module implements the 'systolic_compute_is' class, which simulates a systolic array with Output
-Stationary (OS) dataflow. It handles operand prefetching, demand matrix creation, and performance
-metrics such as mapping efficiency and compute utilization. It also tracks read and write requests
-for IFMAP, Filter, and OFMAP operations.
+systolic_compute_os_overlap
+perfect overlap only
 """
 
 import math
@@ -11,7 +9,7 @@ from tqdm import tqdm
 from scalesim.scale_config import scale_config as cfg
 
 
-class systolic_compute_os:
+class systolic_compute_os_overlap:
     """
     Class that computes the output using Output Stationary dataflow.
     """
@@ -232,8 +230,6 @@ class systolic_compute_os:
 
     #
     def create_demand_matrices(self):
-        # debug
-        print("[DBG os]")
         """
         Method to create ifmap, filter and ofmap demand matrices from the operand matrices. They
         contain several folds of ifmap, filter and ofmap demands. The folding happens because
@@ -244,6 +240,22 @@ class systolic_compute_os:
         self.create_ifmap_demand_mat()
         self.create_filter_demand_mat()
         self.create_ofmap_demand_mat()
+
+
+        #mod for overlap
+        maxT = max(self.ifmap_demand_matrix.shape[0],
+                   self.filter_demand_matrix.shape[0],
+                   self.ofmap_demand_matrix.shape[0])
+        def pad_rows(mat, target):
+            if mat.shape[0] == target:
+                return mat
+            pad = np.ones((target - mat.shape[0], mat.shape[1]),
+                          dtype=mat.dtype) * -1
+            return np.vstack([mat, pad])
+        self.ifmap_demand_matrix = pad_rows(self.ifmap_demand_matrix, maxT)
+        self.filter_demand_matrix = pad_rows(self.filter_demand_matrix, maxT)
+        self.ofmap_demand_matrix  = pad_rows(self.ofmap_demand_matrix,  maxT)
+        # end mod
 
         assert self.ifmap_demand_matrix.shape[0] == self.filter_demand_matrix.shape[0], \
                'IFMAP and Filter demands out of sync'
@@ -289,17 +301,27 @@ class systolic_compute_os:
                 # In this computation scheme we are allowing the generated outputs to drain out
                 # before starting the next fold
                 # This portion accounts for that extra time by adding null requests
-                this_fold_demand = np.concatenate((this_fold_demand, inter_fold_gap_suffix_mat),
-                                                  axis=0)
+                # mod for overlap
+                # this_fold_demand = np.concatenate((this_fold_demand, inter_fold_gap_suffix_mat),
+                #                                  axis=0)
 
                 # Add skew to the IFMAP demand matrix to reflect systolic pipeline fill
                 this_fold_demand = skew_matrix(this_fold_demand)
 
+                # if fr == 0 and fc == 0:
+                #     self.ifmap_demand_matrix = this_fold_demand
+                # else:
+                #     self.ifmap_demand_matrix = \
+                #         np.concatenate((self.ifmap_demand_matrix, this_fold_demand), axis=0)
+
+                # mod for overlap
+                overlap = this_fold_demand.shape[1] - 1   # cols - 1 = arr_row - 1
                 if fr == 0 and fc == 0:
                     self.ifmap_demand_matrix = this_fold_demand
                 else:
-                    self.ifmap_demand_matrix = \
-                        np.concatenate((self.ifmap_demand_matrix, this_fold_demand), axis=0)
+                    self.ifmap_demand_matrix = overlap_concat(self.ifmap_demand_matrix,
+                                                            this_fold_demand,
+                                                            overlap)
 
                 pbar.update(1)
 
@@ -339,17 +361,33 @@ class systolic_compute_os:
                 # In this computation scheme we are allowing the generated outputs to drain out
                 # before starting the next fold
                 # This portion accounts for that extra time by adding null requests
-                this_fold_demand = np.concatenate((this_fold_demand, inter_fold_gap_suffix_mat),
-                                                  axis=0)
+                # mod for overlap
+                # this_fold_demand = np.concatenate((this_fold_demand, inter_fold_gap_suffix_mat),
+                #                                  axis=0)
 
                 # Add skew to the Filter demand matrix to reflect systolic pipeline fill
-                this_fold_demand = skew_matrix(this_fold_demand)
+                # mod for overlap
+                # this_fold_demand = skew_matrix(this_fold_demand)
 
+                # mod for overlap
+                this_fold_demand = skew_matrix(this_fold_demand)
+                overlap = this_fold_demand.shape[1] - 1  # cols - 1
+
+                # mod for overlap
+                # if fr == 0 and fc == 0:
+                #     self.filter_demand_matrix = this_fold_demand
+                # else:
+                #     self.filter_demand_matrix = \
+                #         np.concatenate((self.filter_demand_matrix, this_fold_demand), axis=0)
+
+                overlap = this_fold_demand.shape[1] - 1  # cols - 1 = arr_col - 1 
                 if fr == 0 and fc == 0:
                     self.filter_demand_matrix = this_fold_demand
                 else:
-                    self.filter_demand_matrix = \
-                        np.concatenate((self.filter_demand_matrix, this_fold_demand), axis=0)
+                    self.filter_demand_matrix = overlap_concat(self.filter_demand_matrix,
+                                                            this_fold_demand,
+                                                            overlap)
+
 
                 pbar.update(1)
 
@@ -406,9 +444,11 @@ class systolic_compute_os:
 
                 # Now add the prefix matrix
                 # These are the null demands to account for when the operands are streamed in
-                # and the OFMAPS are not ready
-                this_fold_demand = np.concatenate((inter_fold_gap_prefix_mat, this_fold_demand),
-                                                  axis=0)
+                # and the OFMAPS are not read
+                # mod for overlap
+                if fr == 0 and fc == 0:
+                    this_fold_demand = np.concatenate((inter_fold_gap_prefix_mat, this_fold_demand),
+                                                    axis=0)
 
                 # Calculate the mapping efficiency
                 row_used = min(self.arr_row, row_end_idx - row_start_id)
@@ -427,11 +467,23 @@ class systolic_compute_os:
                 # Add skew to the OFMAP demand matrix to reflect systolic pipeline fill
                 this_fold_demand = skew_matrix(this_fold_demand)
 
+                # mod for overlap
+                # if fr == 0 and fc == 0:
+                #     self.ofmap_demand_matrix = this_fold_demand
+                # else:
+                #     self.ofmap_demand_matrix = \
+                #         np.concatenate((self.ofmap_demand_matrix, this_fold_demand), axis=0)
+
+
+                # mod for overlap
+                overlap = this_fold_demand.shape[1] - 1   
                 if fr == 0 and fc == 0:
                     self.ofmap_demand_matrix = this_fold_demand
                 else:
-                    self.ofmap_demand_matrix = \
-                        np.concatenate((self.ofmap_demand_matrix, this_fold_demand), axis=0)
+                    self.ofmap_demand_matrix = overlap_concat(self.ofmap_demand_matrix,
+                                                            this_fold_demand,
+                                                            overlap)
+
 
                 pbar.update(1)
 
@@ -583,3 +635,23 @@ def skew_matrix(input_matrix_np):
         out_matrix_np[c:c + rows, c] = input_matrix_np[:, c]
 
     return out_matrix_np
+
+def overlap_concat(prev, nxt, overlap):
+    """
+    prev, nxt: 2D numpy arrays with -1 as null.
+    overlap: number of rows to overlap (typically cols - 1)
+    """
+    if prev is None:
+        return nxt
+
+    assert prev.shape[1] == nxt.shape[1]
+
+    # split
+    tail = prev[-overlap:, :]
+    head = nxt[:overlap, :]
+
+ 
+    merged = np.where(head != -1, head, tail)
+
+    return np.vstack([prev[:-overlap, :], merged, nxt[overlap:, :]])
+

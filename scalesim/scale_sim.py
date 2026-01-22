@@ -173,6 +173,18 @@ class scalesim:
             df_string = "Weight Stationary piped"
         elif df == 'is_piped':
             df_string = "Input Stationary piped"
+        elif df == 'os_overlap':
+            df_string = "Output Stationary overlap"
+        elif df == 'ws_overlap':
+            df_string = "Weight Stationary overlap"
+        elif df == 'is_overlap':
+            df_string = "Input Stationary overlap"
+        elif df == 'os_sa':
+            df_string = "Output Stationary sa"
+        elif df == 'ws_sa':
+            df_string = "Weight Stationary sa"
+        elif df == 'is_sa':
+            df_string = "Input Stationary sa"        
         elif df == 'test':
             df_string = "test"
 

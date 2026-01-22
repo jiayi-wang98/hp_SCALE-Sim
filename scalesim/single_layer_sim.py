@@ -14,10 +14,16 @@ from scalesim.layout_utils import layouts as layout
 from scalesim.compute.operand_matrix import operand_matrix as opmat
 from scalesim.compute.systolic_compute_os import systolic_compute_os
 from scalesim.compute.systolic_compute_os_piped import systolic_compute_os_piped
+from scalesim.compute.systolic_compute_os_overlap import systolic_compute_os_overlap
+from scalesim.compute.systolic_compute_os_sa import systolic_compute_os_sa
 from scalesim.compute.systolic_compute_ws import systolic_compute_ws
 from scalesim.compute.systolic_compute_ws_piped import systolic_compute_ws_piped
+from scalesim.compute.systolic_compute_ws_overlap import systolic_compute_ws_overlap
+from scalesim.compute.systolic_compute_ws_sa import systolic_compute_ws_sa
 from scalesim.compute.systolic_compute_is import systolic_compute_is
 from scalesim.compute.systolic_compute_is_piped import systolic_compute_is_piped
+from scalesim.compute.systolic_compute_is_sa import systolic_compute_is_sa
+from scalesim.compute.systolic_compute_is_overlap import systolic_compute_is_overlap
 from scalesim.memory.double_buffered_scratchpad_mem import double_buffered_scratchpad as mem_dbsp
 
 class single_layer_sim:
@@ -133,6 +139,23 @@ class single_layer_sim:
             self.compute_system = systolic_compute_is()
         elif self.dataflow == 'os_piped':
             self.compute_system = systolic_compute_os_piped()
+        elif self.dataflow == 'is_piped':
+            self.compute_system = systolic_compute_is_piped()
+        elif self.dataflow == 'ws_piped':
+            self.compute_system = systolic_compute_ws_piped()
+        elif self.dataflow == 'os_overlap':
+            self.compute_system = systolic_compute_os_overlap()
+        elif self.dataflow == 'is_overlap':
+            self.compute_system = systolic_compute_is_overlap()
+        elif self.dataflow == 'ws_overlap':
+            self.compute_system = systolic_compute_ws_overlap()
+        elif self.dataflow == 'os_sa':
+            self.compute_system = systolic_compute_os_sa()
+        elif self.dataflow == 'is_sa':
+            self.compute_system = systolic_compute_is_sa()
+        elif self.dataflow == 'ws_sa':
+            self.compute_system = systolic_compute_ws_sa()
+
 
         arr_dims = self.config.get_array_dims()
         self.using_ifmap_custom_layout = self.config.using_ifmap_custom_layout
