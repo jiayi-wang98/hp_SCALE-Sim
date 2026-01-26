@@ -54,6 +54,7 @@ class systolic_compute_os_sa:
 
         self.mapping_efficiency_per_fold = []
         self.compute_utility_per_fold = []
+        self.total_cycles = None
 
         # Flags
         self.params_set_flag = False
@@ -87,6 +88,11 @@ class systolic_compute_os_sa:
             pad_rows = skew_factor - remainder
             padding = np.zeros((pad_rows, K))
             ifmap_op_mat = np.vstack((ifmap_op_mat, padding))
+
+            # Also pad OFMAP to maintain consistent row count
+            padding_ofmap = np.zeros((pad_rows, ofmap_op_mat.shape[1]))
+            ofmap_op_mat = np.vstack((ofmap_op_mat, padding_ofmap))    
+
             # If we pad IFMAP, we must logically consider OFMAP padded too for dimension consistency
             # though we will resize OFMAP below anyway.
             M += pad_rows
@@ -112,10 +118,9 @@ class systolic_compute_os_sa:
 
         # 3. Handle OFMAP: Adjust spatial dimension
         # Original: (M, N). Target: (M/3, N)
-        # Since we compressed 3 spatial rows into 1 pipeline stream, the output matrix 
-        # seen by the simulator (for demand generation) assumes fewer rows.
-        # Note: In a real value simulation, this would require unpacking, but for 
-        # cycle/trace generation, resizing is sufficient.
+        # We need to keep the full OFMAP for correct demand generation (draining 3x data),
+        # but the simulator's structural parameters (Sr) are based on the reduced physical rows.
+        self.ofmap_op_mat_full = ofmap_op_mat
         self.ofmap_op_mat = ofmap_op_mat[:(M // skew_factor), :]
         
         # self.ifmap_op_mat = ifmap_op_mat
@@ -386,14 +391,11 @@ class systolic_compute_os_sa:
                 #     self.ifmap_demand_matrix = \
                 #         np.concatenate((self.ifmap_demand_matrix, this_fold_demand), axis=0)
 
-                # mod for overlap
-                overlap = this_fold_demand.shape[1] - 1   # cols - 1 = arr_row - 1 （因为ifmap_demand列数是arr_row）
                 if fr == 0 and fc == 0:
                     self.ifmap_demand_matrix = this_fold_demand
                 else:
-                    self.ifmap_demand_matrix = overlap_concat(self.ifmap_demand_matrix,
-                                                            this_fold_demand,
-                                                            overlap)
+                    self.ifmap_demand_matrix = \
+                        np.concatenate((self.ifmap_demand_matrix, this_fold_demand), axis=0)
 
                 pbar.update(1)
 
@@ -409,8 +411,9 @@ class systolic_compute_os_sa:
         """
         assert self.params_set_flag, 'Parameters are not set'
 
-        inter_fold_gap_suffix = self.arr_row - 1
-        inter_fold_gap_suffix_mat = np.ones((inter_fold_gap_suffix, self.arr_col)) * -1
+        # mod for pre and suf fix
+        # inter_fold_gap_suffix = self.arr_row - 1
+        # inter_fold_gap_suffix_mat = np.ones((inter_fold_gap_suffix, self.arr_col)) * -1
 
         # Debug messages
         #print('DEBUG: create_filter_demand_mat()')
@@ -452,13 +455,11 @@ class systolic_compute_os_sa:
                 #     self.filter_demand_matrix = \
                 #         np.concatenate((self.filter_demand_matrix, this_fold_demand), axis=0)
 
-                overlap = this_fold_demand.shape[1] - 1  # cols - 1 = arr_col - 1 （因为filter_demand列数是arr_col）
                 if fr == 0 and fc == 0:
                     self.filter_demand_matrix = this_fold_demand
                 else:
-                    self.filter_demand_matrix = overlap_concat(self.filter_demand_matrix,
-                                                            this_fold_demand,
-                                                            overlap)
+                    self.filter_demand_matrix = \
+                        np.concatenate((self.filter_demand_matrix, this_fold_demand), axis=0)
 
 
                 pbar.update(1)
@@ -475,8 +476,11 @@ class systolic_compute_os_sa:
         """
         assert self.params_set_flag, 'Parameters are not set'
 
-        inter_fold_gap_prefix = self.T  - 1
-        inter_fold_gap_prefix_mat = np.ones((inter_fold_gap_prefix, self.arr_col)) * -1
+        # mod for ofmap counting
+        inter_fold_gap_prefix = self.T - 1
+        inter_fold_gap_prefix_mat = np.ones((max(inter_fold_gap_prefix, 0), self.arr_col)) * -1
+        inter_fold_gap_between = self.T - (skew_factor * self.arr_row) - (self.arr_col - 1)
+        inter_fold_gap_between_mat = np.ones((max(inter_fold_gap_between, 0), self.arr_col)) * -1
 
         # Debug messages
         #print('DEBUG: create_ifmap_demand_mat()')
@@ -492,8 +496,39 @@ class systolic_compute_os_sa:
                 col_end_idx = min(col_start_id + self.arr_col, self.Sc)
                 col_delta = self.arr_col - (col_end_idx - col_start_id)
 
-                this_fold_demand = \
-                    self.ofmap_op_mat[row_start_id: row_end_idx, col_start_id: col_end_idx]
+                # --- START: Modified for 3-Cycle Output ---
+                # We need to extract the full 3x rows corresponding to these physical rows
+                logical_start = row_start_id * skew_factor
+                logical_end = row_end_idx * skew_factor
+                
+                # Extract block: (NumPhy * 3, Cols)
+                block = self.ofmap_op_mat_full[logical_start:logical_end, col_start_id:col_end_idx]
+                
+                # Reshape to (NumPhy, 3, Cols) to manipulate the temporal batch
+                num_phy_rows = row_end_idx - row_start_id
+                # Note: block.shape[0] should be num_phy_rows * 3
+                
+                # We want to stack them such that after 'flip' (reflection along rows), they come out in correct order.
+                # Standard 'flip' reverses the 0-th dimension.
+                # If we want A, B, C to come out in order 0, 1, 2...
+                # And 'skew_matrix' drains Row 0 first?
+                # Usually systolic: Bottom physical row drains first.
+                # Within a physical row, we have temporal sequence A->B->C.
+                # So we want sequence A, B, C.
+                # If we produce a stack [A, B, C], and 'flip' reverses it to [C, B, A].
+                # Then 'skew_matrix' (if it drains top-down) would drain C, then B, then A.
+                # To get A, B, C, we need to present [A, B, C] to skew_matrix.
+                # So we need [C, B, A] BEFORE flip.
+                
+                block_reshaped = block.reshape(num_phy_rows, skew_factor, -1)
+                
+                # Reverse the inner batch dimension: [A, B, C] -> [C, B, A]
+                block_reversed = block_reshaped[:, ::-1, :]
+                
+                # Flatten back to (NumPhy * 3, Cols)
+                this_fold_demand = block_reversed.reshape(-1, block_reversed.shape[-1])
+                # --- END: Modified ---
+
                 self.ofmap_writes += this_fold_demand.shape[0] * this_fold_demand.shape[1]
 
                 # Adding null requests when there is under utilization ie. no mapping along a few
@@ -503,7 +538,10 @@ class systolic_compute_os_sa:
                     this_fold_demand = np.concatenate((this_fold_demand, null_req_mat), axis=1)
 
                 if row_delta > 0:
-                    null_req_mat = np.ones((row_delta, self.arr_col)) * -1
+                    # Note: We are padding PHYSICAL rows.
+                    # So we need to add 'row_delta * 3' null rows?
+                    # Yes, to maintain the time structure.
+                    null_req_mat = np.ones((row_delta * skew_factor, self.arr_col)) * -1
                     this_fold_demand = np.concatenate((this_fold_demand, null_req_mat), axis=0)
 
                 # Reflect along the rows
@@ -514,11 +552,14 @@ class systolic_compute_os_sa:
                 this_fold_demand = np.flip(this_fold_demand, 0)
                 self.ofmap_writes += this_fold_demand.shape[0] + this_fold_demand.shape[1]
 
-                # Now add the prefix matrix
-                # These are the null demands to account for when the operands are streamed in
-                # and the OFMAPS are not ready
-                this_fold_demand = np.concatenate((inter_fold_gap_prefix_mat, this_fold_demand),
-                                                  axis=0)
+                # Now add the prefix/gap matrix (before skew)
+                # Prefix accounts for the initial T-1 latency. Gaps align subsequent folds.
+                if fr == 0 and fc == 0:
+                    this_fold_demand = np.concatenate((inter_fold_gap_prefix_mat, this_fold_demand),
+                                                      axis=0)
+                else:
+                    this_fold_demand = np.concatenate((inter_fold_gap_between_mat, this_fold_demand),
+                                                      axis=0)
 
                 # Calculate the mapping efficiency
                 row_used = min(self.arr_row, row_end_idx - row_start_id)
@@ -545,14 +586,13 @@ class systolic_compute_os_sa:
                 #         np.concatenate((self.ofmap_demand_matrix, this_fold_demand), axis=0)
 
 
-                # mod for overlap
-                overlap = this_fold_demand.shape[1] - 1   # = arr_col - 1，因为OFMAP demand的列数是arr_col
+                # Keep explicit gaps between folds; no overlap merge.
                 if fr == 0 and fc == 0:
                     self.ofmap_demand_matrix = this_fold_demand
                 else:
-                    self.ofmap_demand_matrix = overlap_concat(self.ofmap_demand_matrix,
-                                                            this_fold_demand,
-                                                            overlap)
+                    self.ofmap_demand_matrix = np.concatenate(
+                        (self.ofmap_demand_matrix, this_fold_demand), axis=0
+                    )
 
 
                 pbar.update(1)
@@ -653,12 +693,28 @@ class systolic_compute_os_sa:
         """
         assert self.demand_mat_ready_flag, 'Computes not ready yet'
 
+        # mod start compute util
+        if self.total_cycles is not None:
+            total_compute_cycles = self.Sr * self.Sc * self.T
+            avg_compute_util = \
+                total_compute_cycles / (self.arr_row * self.arr_col * self.total_cycles)
+            return avg_compute_util
+        # mod end compute util
+
         agg = sum(self.compute_utility_per_fold)
         num = len(self.compute_utility_per_fold)
 
         avg_compute_util = agg / num
 
         return avg_compute_util
+
+    # mod start compute util
+    def set_total_cycles(self, total_cycles):
+        """
+        Method to set total cycles for compute utilization.
+        """
+        self.total_cycles = total_cycles
+    # mod end compute util
 
     #
     def get_ifmap_requests(self):
@@ -724,4 +780,3 @@ def overlap_concat(prev, nxt, overlap):
     merged = np.where(head != -1, head, tail)
 
     return np.vstack([prev[:-overlap, :], merged, nxt[overlap:, :]])
-

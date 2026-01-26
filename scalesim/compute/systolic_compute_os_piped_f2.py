@@ -7,9 +7,9 @@ import math
 import numpy as np
 from tqdm import tqdm
 from scalesim.scale_config import scale_config as cfg
-skew_factor = 3
+skew_factor = 2
 
-class systolic_compute_os_piped:
+class systolic_compute_os_piped_f2:
     """
     Class that computes the output using Output Stationary dataflow.
     """
@@ -282,7 +282,7 @@ class systolic_compute_os_piped:
     #
     def create_demand_matrices(self):
         # debug
-        print("[DBG os piped]")
+        print("[DBG os piped f2]")
         """
         Method to create ifmap, filter and ofmap demand matrices from the operand matrices. They
         contain several folds of ifmap, filter and ofmap demands. The folding happens because

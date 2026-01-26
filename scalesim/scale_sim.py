@@ -184,7 +184,31 @@ class scalesim:
         elif df == 'ws_sa':
             df_string = "Weight Stationary sa"
         elif df == 'is_sa':
-            df_string = "Input Stationary sa"        
+            df_string = "Input Stationary sa"
+        elif df == 'os_sa_f2':
+            df_string = "Output Stationary sa 2-stage"
+        elif df == 'ws_sa_f2':
+            df_string = "Weight Stationary sa 2-stage"
+        elif df == 'is_sa_f2':
+            df_string = "Input Stationary sa 2-stage"      
+        elif df == 'os_sa_f4':
+            df_string = "Output Stationary sa 4-stage"
+        elif df == 'ws_sa_f4':
+            df_string = "Weight Stationary sa 4-stage"
+        elif df == 'is_sa_f4':
+            df_string = "Input Stationary sa 4-stage"
+        elif df == 'os_piped_f2':
+            df_string = "Output Stationary piped 2-stage"
+        elif df == 'ws_piped_f2':
+            df_string = "Weight Stationary piped 2-stage"
+        elif df == 'is_piped_f2':
+            df_string = "Input Stationary piped 2-stage"
+        elif df == 'os_piped_f4':
+            df_string = "Output Stationary piped 4-stage"
+        elif df == 'ws_piped_f4':
+            df_string = "Weight Stationary piped 4-stage"
+        elif df == 'is_piped_f4':
+            df_string = "Input Stationary piped 4-stage"              
         elif df == 'test':
             df_string = "test"
 

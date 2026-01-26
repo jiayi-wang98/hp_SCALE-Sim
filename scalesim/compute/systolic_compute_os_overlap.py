@@ -52,6 +52,7 @@ class systolic_compute_os_overlap:
 
         self.mapping_efficiency_per_fold = []
         self.compute_utility_per_fold = []
+        self.total_cycles = None
 
         # Flags
         self.params_set_flag = False
@@ -403,8 +404,10 @@ class systolic_compute_os_overlap:
         """
         assert self.params_set_flag, 'Parameters are not set'
 
-        inter_fold_gap_prefix = self.T  - 1
-        inter_fold_gap_prefix_mat = np.ones((inter_fold_gap_prefix, self.arr_col)) * -1
+        inter_fold_gap_prefix = self.T - 1
+        inter_fold_gap_prefix_mat = np.ones((max(inter_fold_gap_prefix, 0), self.arr_col)) * -1
+        inter_fold_gap_between = self.T - self.arr_row - (self.arr_col - 1)
+        inter_fold_gap_between_mat = np.ones((max(inter_fold_gap_between, 0), self.arr_col)) * -1
 
         # Debug messages
         #print('DEBUG: create_ifmap_demand_mat()')
@@ -442,14 +445,14 @@ class systolic_compute_os_overlap:
                 this_fold_demand = np.flip(this_fold_demand, 0)
                 self.ofmap_writes += this_fold_demand.shape[0] + this_fold_demand.shape[1]
 
-                # Now add the prefix matrix
-                # These are the null demands to account for when the operands are streamed in
-                # and the OFMAPS are not read
-                # mod for overlap
+                # Now add the prefix/gap matrix (before skew)
+                # Prefix accounts for the initial T-1 latency. Gaps align subsequent folds.
                 if fr == 0 and fc == 0:
                     this_fold_demand = np.concatenate((inter_fold_gap_prefix_mat, this_fold_demand),
-                                                    axis=0)
-
+                                                      axis=0)
+                else:
+                    this_fold_demand = np.concatenate((inter_fold_gap_between_mat, this_fold_demand),
+                                                      axis=0)
                 # Calculate the mapping efficiency
                 row_used = min(self.arr_row, row_end_idx - row_start_id)
                 col_used = min(self.arr_col, col_end_idx - col_start_id)
@@ -457,6 +460,10 @@ class systolic_compute_os_overlap:
                 mapping_eff_this_fold = mac_used / (self.arr_row * self.arr_col)
 
                 cycles_this_fold = this_fold_demand.shape[0] + this_fold_demand.shape[1] - 1
+                # mod adjust the compute util
+                if not (fr == 0 and fc == 0):
+                    cycles_this_fold += (self.T - 1)
+                # mod end
                 compute_cycles_this_fold = mac_used * self.T
                 compute_util_this_fold = \
                     compute_cycles_this_fold / (self.arr_row * self.arr_col * cycles_this_fold)
@@ -475,14 +482,13 @@ class systolic_compute_os_overlap:
                 #         np.concatenate((self.ofmap_demand_matrix, this_fold_demand), axis=0)
 
 
-                # mod for overlap
-                overlap = this_fold_demand.shape[1] - 1   
+                # Keep explicit gaps between folds; no overlap merge.
                 if fr == 0 and fc == 0:
                     self.ofmap_demand_matrix = this_fold_demand
                 else:
-                    self.ofmap_demand_matrix = overlap_concat(self.ofmap_demand_matrix,
-                                                            this_fold_demand,
-                                                            overlap)
+                    self.ofmap_demand_matrix = np.concatenate(
+                        (self.ofmap_demand_matrix, this_fold_demand), axis=0
+                    )
 
 
                 pbar.update(1)
@@ -583,12 +589,28 @@ class systolic_compute_os_overlap:
         """
         assert self.demand_mat_ready_flag, 'Computes not ready yet'
 
+        # mod start compute util
+        if self.total_cycles is not None:
+            total_compute_cycles = self.Sr * self.Sc * self.T
+            avg_compute_util = \
+                total_compute_cycles / (self.arr_row * self.arr_col * self.total_cycles)
+            return avg_compute_util
+        # mod end compute util
+
         agg = sum(self.compute_utility_per_fold)
         num = len(self.compute_utility_per_fold)
 
         avg_compute_util = agg / num
 
         return avg_compute_util
+
+    # mod start compute util
+    def set_total_cycles(self, total_cycles):
+        """
+        Method to set total cycles for compute utilization.
+        """
+        self.total_cycles = total_cycles
+    # mod end compute util
 
     #
     def get_ifmap_requests(self):
@@ -654,4 +676,3 @@ def overlap_concat(prev, nxt, overlap):
     merged = np.where(head != -1, head, tail)
 
     return np.vstack([prev[:-overlap, :], merged, nxt[overlap:, :]])
-

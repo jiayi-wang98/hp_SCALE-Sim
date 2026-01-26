@@ -26,6 +26,20 @@ from scalesim.compute.systolic_compute_is_sa import systolic_compute_is_sa
 from scalesim.compute.systolic_compute_is_overlap import systolic_compute_is_overlap
 from scalesim.memory.double_buffered_scratchpad_mem import double_buffered_scratchpad as mem_dbsp
 
+
+from scalesim.compute.systolic_compute_os_piped_f2 import systolic_compute_os_piped_f2
+from scalesim.compute.systolic_compute_os_piped_f4 import systolic_compute_os_piped_f4
+from scalesim.compute.systolic_compute_os_sa_f2 import systolic_compute_os_sa_f2
+from scalesim.compute.systolic_compute_os_sa_f4 import systolic_compute_os_sa_f4
+from scalesim.compute.systolic_compute_is_piped_f2 import systolic_compute_is_piped_f2
+from scalesim.compute.systolic_compute_is_piped_f4 import systolic_compute_is_piped_f4
+from scalesim.compute.systolic_compute_is_sa_f2 import systolic_compute_is_sa_f2
+from scalesim.compute.systolic_compute_is_sa_f4 import systolic_compute_is_sa_f4
+from scalesim.compute.systolic_compute_ws_piped_f2 import systolic_compute_ws_piped_f2
+from scalesim.compute.systolic_compute_ws_piped_f4 import systolic_compute_ws_piped_f4
+from scalesim.compute.systolic_compute_ws_sa_f2 import systolic_compute_ws_sa_f2
+from scalesim.compute.systolic_compute_ws_sa_f4 import systolic_compute_ws_sa_f4
+
 class single_layer_sim:
     """
     Class which runs the simulation for a single layer and generates report data
@@ -155,6 +169,30 @@ class single_layer_sim:
             self.compute_system = systolic_compute_is_sa()
         elif self.dataflow == 'ws_sa':
             self.compute_system = systolic_compute_ws_sa()
+        elif self.dataflow == 'os_sa_f2':
+            self.compute_system = systolic_compute_os_sa_f2()
+        elif self.dataflow == 'is_sa_f2':
+            self.compute_system = systolic_compute_is_sa_f2()
+        elif self.dataflow == 'ws_sa_f2':
+            self.compute_system = systolic_compute_ws_sa_f2()
+        elif self.dataflow == 'os_sa_f4':
+            self.compute_system = systolic_compute_os_sa_f4()
+        elif self.dataflow == 'is_sa_f4':
+            self.compute_system = systolic_compute_is_sa_f4()
+        elif self.dataflow == 'ws_sa_f4':
+            self.compute_system = systolic_compute_ws_sa_f4()
+        elif self.dataflow == 'os_piped_f2':
+            self.compute_system = systolic_compute_os_piped_f2()
+        elif self.dataflow == 'is_piped_f2':
+            self.compute_system = systolic_compute_is_piped_f2()
+        elif self.dataflow == 'ws_piped_f2':
+            self.compute_system = systolic_compute_ws_piped_f2()
+        elif self.dataflow == 'os_piped_f4':
+            self.compute_system = systolic_compute_os_piped_f4()
+        elif self.dataflow == 'is_piped_f4':
+            self.compute_system = systolic_compute_is_piped_f4()
+        elif self.dataflow == 'ws_piped_f4':
+            self.compute_system = systolic_compute_ws_piped_f4()
 
 
         arr_dims = self.config.get_array_dims()
@@ -362,6 +400,10 @@ class single_layer_sim:
         # Compute report
         self.total_cycles = self.memory_system.get_total_compute_cycles()# - self.memory_system.get_stall_cycles()
         self.stall_cycles = self.memory_system.get_stall_cycles()
+        # mod start compute util
+        if hasattr(self.compute_system, "set_total_cycles"):
+            self.compute_system.set_total_cycles(self.total_cycles)
+        # mod end compute util
         self.overall_util = (self.num_compute * 100) / (self.total_cycles * self.num_mac_unit)
         self.mapping_eff = self.compute_system.get_avg_mapping_efficiency() * 100
         self.compute_util = self.compute_system.get_avg_compute_utilization() * 100
