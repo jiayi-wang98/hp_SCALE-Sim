@@ -259,7 +259,7 @@ class systolic_compute_ws_sa_f4:
 
         inter_fold_gap_prefix = self.arr_row
         inter_fold_gap_prefix_mat = np.ones((inter_fold_gap_prefix, self.arr_row)) * -1
-        inter_fold_gap_between = self.T
+        inter_fold_gap_between = self.arr_row
         inter_fold_gap_between_mat = np.ones((inter_fold_gap_between, self.arr_row)) * -1
 
         # mod for piped
@@ -475,7 +475,7 @@ class systolic_compute_ws_sa_f4:
 
         inter_fold_gap_prefix = self.arr_row + (self.arr_row * skew_factor)
         inter_fold_gap_prefix_mat = np.ones((inter_fold_gap_prefix, self.arr_col)) * -1
-        inter_fold_gap_between = self.T
+        inter_fold_gap_between = self.arr_row
         inter_fold_gap_between_mat = np.ones((inter_fold_gap_between, self.arr_col)) * -1
 
         metadata_conversion_mat = [ [ ] ]
