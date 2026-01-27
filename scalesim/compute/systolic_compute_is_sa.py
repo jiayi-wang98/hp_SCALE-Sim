@@ -54,6 +54,7 @@ class systolic_compute_is_sa:
 
         self.mapping_efficiency_per_fold = []
         self.compute_utility_per_fold = []
+        self.total_cycles = None
 
         # Flags
         self.params_set_flag = False
@@ -286,6 +287,8 @@ class systolic_compute_is_sa:
                 mapping_eff_this_fold = mac_used / (self.arr_row * self.arr_col)
 
                 cycles_this_fold = this_fold_demand.shape[0] + this_fold_demand.shape[1] - 1
+                # Mod for overlap: Add back the hidden compute/drain time
+                cycles_this_fold += (self.arr_row + self.arr_col + self.T - 2)
                 compute_cycles_this_fold = mac_used * self.T
                 compute_util_this_fold = \
                     compute_cycles_this_fold / (self.arr_row * self.arr_col * cycles_this_fold)
@@ -371,7 +374,7 @@ class systolic_compute_is_sa:
         """
         assert self.params_set_flag, 'Parameters are not set'
 
-        inter_fold_gap_prefix = 2 * self.arr_row - 1
+        inter_fold_gap_prefix = max(0, self.T - self.arr_row)
         inter_fold_gap_prefix_mat = np.ones((inter_fold_gap_prefix, self.arr_col)) * -1
 
         for fc in range(self.col_fold):
@@ -393,8 +396,8 @@ class systolic_compute_is_sa:
                 # Now add the prefix matrix
                 # These are the null demands to account for when the operands are streamed in
                 # and the OFMAPS are not ready
-                if fr == 0 and fc == 0:
-                    this_fold_demand = np.concatenate((inter_fold_gap_prefix_mat, this_fold_demand),
+                # if fr == 0 and fc == 0:
+                this_fold_demand = np.concatenate((inter_fold_gap_prefix_mat, this_fold_demand),
                                                   axis=0)
 
                 # Add skew to the OFMAP demand matrix to reflect systolic pipeline fill
@@ -506,12 +509,28 @@ class systolic_compute_is_sa:
         """
         assert self.demand_mat_ready_flag, 'Computes not ready yet'
 
+        # mod start compute util
+        if self.total_cycles is not None:
+            total_compute_cycles = self.Sr * self.Sc * self.T
+            avg_compute_util = \
+                total_compute_cycles / (self.arr_row * self.arr_col * self.total_cycles)
+            return avg_compute_util
+        # mod end compute util
+
         agg = sum(self.compute_utility_per_fold)
         num = len(self.compute_utility_per_fold)
 
         avg_compute_util = agg / num
 
         return avg_compute_util
+
+    # mod start compute util
+    def set_total_cycles(self, total_cycles):
+        """
+        Method to set total cycles for compute utilization.
+        """
+        self.total_cycles = total_cycles
+    # mod end compute util
 
     #
     def get_ifmap_requests(self):

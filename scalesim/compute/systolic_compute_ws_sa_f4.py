@@ -10,9 +10,9 @@ import numpy as np
 from tqdm import tqdm
 from scalesim.scale_config import scale_config as cfg
 from scalesim.compute.compression import compression as cp
-skew_factor = 3
+skew_factor = 4
 
-class systolic_compute_ws_sa:
+class systolic_compute_ws_sa_f4:
     """
     Class that computes the output using Weight Stationary dataflow.
     """
@@ -211,7 +211,7 @@ class systolic_compute_ws_sa:
     #
     def create_demand_matrices(self):
         # debug
-        print("[DBG ws sa]")
+        print("[DBG ws sa f4]")
         """
         Method to create ifmap, filter and ofmap demand matrices from the operand matrices. They
         contain several folds of ifmap, filter and ofmap demands. The folding happens because

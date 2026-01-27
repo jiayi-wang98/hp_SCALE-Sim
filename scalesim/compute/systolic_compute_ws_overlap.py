@@ -255,11 +255,9 @@ class systolic_compute_ws_overlap:
         assert self.params_set_flag, 'Parameters are not set'
 
         inter_fold_gap_prefix = self.arr_row
-        inter_fold_gap_prefix_mat = np.ones((inter_fold_gap_prefix, self.arr_row)) * -1
-
-        inter_fold_gap_suffix = self.arr_col - 1
-
-        inter_fold_gap_suffix_mat = np.ones((inter_fold_gap_suffix, self.arr_row)) * -1
+        inter_fold_gap_prefix_mat = np.ones((max(inter_fold_gap_prefix, 0), self.arr_row)) * -1
+        inter_fold_gap_between = self.arr_row
+        inter_fold_gap_between_mat = np.ones((max(inter_fold_gap_between, 0), self.arr_row)) * -1
 
         metadata_conversion_mat = [ [ ] ]
         if False:
@@ -272,6 +270,7 @@ class systolic_compute_ws_overlap:
                     metadata_conversion_mat = np.ones((0, self.arr_col)) * -1
 
         ifmap_demand_matrix_list = []
+        last_fold_start_row = None
 
         for fc in range(self.col_fold):
             # for fr in range(self.row_fold):
@@ -321,37 +320,24 @@ class systolic_compute_ws_overlap:
                             constant_values=-1
                         )
 
-                # mod for overlap
-                # Account for the cycles for weights to load
-                if fr == 0 and fc == 0:
-                    this_fold_demand = np.concatenate((inter_fold_gap_prefix_mat, this_fold_demand),
-                                                     axis=0)
-
-                # Account for the cycles for final output to drain out
-                if self.config.sparsity_support and self.config.sparsity_optimized_mapping:
-                    if inter_fold_gap_suffix_mat.shape[1] < this_fold_demand.shape[1]:
-                        inter_fold_gap_suffix_mat = np.pad(
-                            inter_fold_gap_suffix_mat,
-                            ((0, 0), (0, this_fold_demand.shape[1] - inter_fold_gap_suffix_mat.shape[1])),  # Pad only columns, not rows
-                            constant_values=-1
-                        )
-                #this_fold_demand = np.concatenate((this_fold_demand, inter_fold_gap_suffix_mat),
-                #                                  axis=0)                
-
                 # Add skew to the IFMAP demand matrix to reflect systolic pipeline fill
                 if not self.config.sparsity_optimized_mapping:
+                    base_rows = this_fold_demand.shape[0]
                     this_fold_demand = skew_matrix(this_fold_demand)
+                else:
+                    base_rows = this_fold_demand.shape[0]
 
-                ifmap_demand_matrix_list.append(this_fold_demand)
-        
-        # mod for overlap
-        # self.ifmap_demand_matrix = np.concatenate(ifmap_demand_matrix_list)
-        full_demand = None
-        for this_fold_demand in ifmap_demand_matrix_list:
-            overlap = this_fold_demand.shape[1] - 1
-            full_demand = overlap_concat(full_demand, this_fold_demand, overlap)
-
-        self.ifmap_demand_matrix = full_demand
+                # Place folds by start time; gaps are pure time and do not get skewed.
+                if fr == 0 and fc == 0:
+                    self.ifmap_demand_matrix = np.concatenate(
+                        (inter_fold_gap_prefix_mat, this_fold_demand), axis=0)
+                    last_fold_start_row = inter_fold_gap_prefix
+                else:
+                    fold_start_row = last_fold_start_row + base_rows + inter_fold_gap_between
+                    self.ifmap_demand_matrix = overlay_with_offset(self.ifmap_demand_matrix,
+                                                                   this_fold_demand,
+                                                                   fold_start_row)
+                    last_fold_start_row = fold_start_row
 
 
         if False:
@@ -368,8 +354,9 @@ class systolic_compute_ws_overlap:
         """
         assert self.params_set_flag, 'Parameters are not set'
 
-        inter_fold_gap_suffix = self.arr_row + self.arr_col + self.T - 2
-        inter_fold_gap_suffix_mat = np.ones((inter_fold_gap_suffix, self.arr_col)) * -1
+        fold_len = (self.arr_row + self.arr_col - 1)
+        inter_fold_gap_between = max(self.T + self.arr_row - fold_len, 0)
+        inter_fold_gap_between_mat = np.ones((max(inter_fold_gap_between, 0), self.arr_col)) * -1
 
         metadata_conversion_mat = [ [ ] ]
         if False:
@@ -413,10 +400,14 @@ class systolic_compute_ws_overlap:
 
                 sum_sparse = sum(list(row).count(-1) for row in this_fold_demand)
 
-                # mod for overlap
-                # Time for inputs to stream and the partial sums to drain out
-                # this_fold_demand = np.concatenate((this_fold_demand, inter_fold_gap_suffix_mat),
-                #                                  axis=0)
+                if fr == 0 and fc == 0:
+                    pass
+                else:
+                    this_fold_demand = np.concatenate((inter_fold_gap_between_mat, this_fold_demand),
+                                                      axis=0)
+
+                # Skew filter columns to align replacement with in-flight compute
+                this_fold_demand = skew_matrix(this_fold_demand)
 
 
                 # Calculate the mapping efficiency
@@ -429,6 +420,7 @@ class systolic_compute_ws_overlap:
                     ((self.arr_row * self.arr_col) - sum_sparse) / (self.arr_row * self.arr_col)
 
                 cycles_this_fold = this_fold_demand.shape[0] + this_fold_demand.shape[1] - 1
+                # Mod for overlap: explicit gaps already modeled
                 compute_cycles_this_fold = mac_used * self.T
                 compute_util_this_fold = \
                     compute_cycles_this_fold / (self.arr_row * self.arr_col * cycles_this_fold)
@@ -439,12 +431,9 @@ class systolic_compute_ws_overlap:
                 # mod for overlap
                 # filter_demand_matrix_list.append(this_fold_demand)
 
-                if fr == 0 and fc == 0:
-                    self.filter_demand_matrix = this_fold_demand
-                else:
-                    self.filter_demand_matrix = \
-                       np.concatenate((self.filter_demand_matrix, this_fold_demand), axis=0)
-        # self.filter_demand_matrix = np.concatenate(filter_demand_matrix_list)
+                filter_demand_matrix_list.append(this_fold_demand)
+
+        self.filter_demand_matrix = np.concatenate(filter_demand_matrix_list)
 
 
         if False:
@@ -461,8 +450,10 @@ class systolic_compute_ws_overlap:
         """
         assert self.params_set_flag, 'Parameters are not set'
 
-        inter_fold_gap_prefix = 2 * self.arr_row - 1
-        inter_fold_gap_prefix_mat = np.ones((inter_fold_gap_prefix, self.arr_col)) * -1
+        inter_fold_gap_prefix = 2 * self.arr_row
+        inter_fold_gap_prefix_mat = np.ones((max(inter_fold_gap_prefix, 0), self.arr_col)) * -1
+        inter_fold_gap_between = self.arr_row
+        inter_fold_gap_between_mat = np.ones((max(inter_fold_gap_between, 0), self.arr_col)) * -1
 
         metadata_conversion_mat = [ [ ] ]
         if False:
@@ -475,6 +466,7 @@ class systolic_compute_ws_overlap:
                     metadata_conversion_mat = np.ones((0, self.arr_col)) * -1
 
         ofmap_demand_matrix_list = []
+        last_fold_start_row = None
 
         for fc in range(self.col_fold):
             # for fr in range(self.row_fold):
@@ -492,33 +484,21 @@ class systolic_compute_ws_overlap:
                     null_req_mat = np.ones((this_fold_demand.shape[0], col_delta)) * -1
                     this_fold_demand = np.concatenate((this_fold_demand, null_req_mat), axis=1)
 
-                # Now add the prefix matrix
-                # These are the null demands to account for when the operands are streamed in
-                # and the OFMAPS are not ready
-                # mod for overlap
-                if fr == 0 and fc == 0:
-                    this_fold_demand = np.concatenate((inter_fold_gap_prefix_mat, this_fold_demand),
-                                                  axis=0)
-
                 # Add skew to the OFMAP demand matrix to reflect systolic pipeline fill
+                base_rows = this_fold_demand.shape[0]
                 this_fold_demand = skew_matrix(this_fold_demand)
 
-                ofmap_demand_matrix_list.append(this_fold_demand)
-                #if fr == 0 and fc == 0:
-                #    self.ofmap_demand_matrix = this_fold_demand
-                #else:
-                #    self.ofmap_demand_matrix = \
-                #       np.concatenate((self.ofmap_demand_matrix, this_fold_demand), axis=0)
-
-
-        # mode for overlap
-        # self.ofmap_demand_matrix = np.concatenate(ofmap_demand_matrix_list)
-        full_demand = None
-        for this_fold_demand in ofmap_demand_matrix_list:
-            overlap = this_fold_demand.shape[1] - 1
-            full_demand = overlap_concat(full_demand, this_fold_demand, overlap)
-
-        self.ofmap_demand_matrix = full_demand
+                # Place folds by start time; gaps are pure time and do not get skewed.
+                if fr == 0 and fc == 0:
+                    self.ofmap_demand_matrix = np.concatenate(
+                        (inter_fold_gap_prefix_mat, this_fold_demand), axis=0)
+                    last_fold_start_row = inter_fold_gap_prefix
+                else:
+                    fold_start_row = last_fold_start_row + base_rows + inter_fold_gap_between
+                    self.ofmap_demand_matrix = overlay_with_offset(self.ofmap_demand_matrix,
+                                                                   this_fold_demand,
+                                                                   fold_start_row)
+                    last_fold_start_row = fold_start_row
 
 
         if False:
@@ -731,3 +711,24 @@ def overlap_concat(prev, nxt, overlap):
     merged = np.where(head != -1, head, tail)
     return np.vstack([prev[:-overlap, :], merged, nxt[overlap:, :]])
 
+def overlay_with_offset(prev, nxt, offset):
+    """
+    Overlay nxt on top of prev starting at row offset.
+    Non -1 values in nxt take priority.
+    """
+    if prev is None:
+        if offset <= 0:
+            return nxt
+        pad = np.ones((offset, nxt.shape[1]), dtype=nxt.dtype) * -1
+        return np.vstack([pad, nxt])
+
+    assert prev.shape[1] == nxt.shape[1]
+
+    out_rows = max(prev.shape[0], offset + nxt.shape[0])
+    out = np.ones((out_rows, prev.shape[1]), dtype=prev.dtype) * -1
+    out[:prev.shape[0], :] = prev
+
+    existing = out[offset:offset + nxt.shape[0], :]
+    merged = np.where(nxt != -1, nxt, existing)
+    out[offset:offset + nxt.shape[0], :] = merged
+    return out

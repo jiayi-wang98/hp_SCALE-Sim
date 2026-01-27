@@ -1,18 +1,16 @@
 """
-systolic_compute_ws_sa
-overlap and piped
+systolic_compute_ws_piped
+ws piped
 """
-
-
 
 import math
 import numpy as np
 from tqdm import tqdm
 from scalesim.scale_config import scale_config as cfg
 from scalesim.compute.compression import compression as cp
-skew_factor = 3
+skew_factor = 4
 
-class systolic_compute_ws_sa:
+class systolic_compute_ws_piped_f4:
     """
     Class that computes the output using Weight Stationary dataflow.
     """
@@ -211,7 +209,7 @@ class systolic_compute_ws_sa:
     #
     def create_demand_matrices(self):
         # debug
-        print("[DBG ws sa]")
+        print("[DBG ws piped f4]")
         """
         Method to create ifmap, filter and ofmap demand matrices from the operand matrices. They
         contain several folds of ifmap, filter and ofmap demands. The folding happens because
@@ -224,10 +222,10 @@ class systolic_compute_ws_sa:
         self.create_filter_demand_mat()
         self.create_ofmap_demand_mat()   
 
-        # mod for overlap
+        # Align demand matrix lengths to the longest stream
         maxT = max(self.ifmap_demand_matrix.shape[0],
-            self.filter_demand_matrix.shape[0],
-            self.ofmap_demand_matrix.shape[0])
+                   self.filter_demand_matrix.shape[0],
+                   self.ofmap_demand_matrix.shape[0])
         def pad_rows(mat, target):
             if mat.shape[0] == target:
                 return mat
@@ -236,8 +234,7 @@ class systolic_compute_ws_sa:
             return np.vstack([mat, pad])
         self.ifmap_demand_matrix = pad_rows(self.ifmap_demand_matrix, maxT)
         self.filter_demand_matrix = pad_rows(self.filter_demand_matrix, maxT)
-        self.ofmap_demand_matrix  = pad_rows(self.ofmap_demand_matrix,  maxT)
-
+        self.ofmap_demand_matrix = pad_rows(self.ofmap_demand_matrix, maxT)
 
         # assert self.ifmap_demand_matrix.shape[0] == self.filter_demand_matrix.shape[0], \
         #        'IFMAP and Filter demands out of sync'
@@ -259,13 +256,8 @@ class systolic_compute_ws_sa:
 
         inter_fold_gap_prefix = self.arr_row
         inter_fold_gap_prefix_mat = np.ones((inter_fold_gap_prefix, self.arr_row)) * -1
-        inter_fold_gap_between = self.T
+        inter_fold_gap_between = self.arr_row + ((self.arr_row + 1) * skew_factor)
         inter_fold_gap_between_mat = np.ones((inter_fold_gap_between, self.arr_row)) * -1
-
-        # mod for piped
-        # inter_fold_gap_suffix = self.arr_col - 1
-        # mof for piped
-        # inter_fold_gap_suffix_mat = np.ones((inter_fold_gap_suffix, self.arr_row)) * -1
 
         metadata_conversion_mat = [ [ ] ]
         if False:
@@ -326,41 +318,21 @@ class systolic_compute_ws_sa:
                             constant_values=-1
                         )
 
-                # mod for overlap
                 # Account for the cycles for weights to load
                 if fr == 0 and fc == 0:
                     this_fold_demand = np.concatenate((inter_fold_gap_prefix_mat, this_fold_demand),
-                                                   axis=0)
+                                                      axis=0)
                 else:
                     this_fold_demand = np.concatenate((inter_fold_gap_between_mat, this_fold_demand),
-                                                   axis=0)
-
-                # Account for the cycles for final output to drain out
-                if self.config.sparsity_support and self.config.sparsity_optimized_mapping:
-                    if inter_fold_gap_suffix_mat.shape[1] < this_fold_demand.shape[1]:
-                        inter_fold_gap_suffix_mat = np.pad(
-                            inter_fold_gap_suffix_mat,
-                            ((0, 0), (0, this_fold_demand.shape[1] - inter_fold_gap_suffix_mat.shape[1])),  # Pad only columns, not rows
-                            constant_values=-1
-                        )
-                #this_fold_demand = np.concatenate((this_fold_demand, inter_fold_gap_suffix_mat),
-                #                                  axis=0)                
+                                                      axis=0)
 
                 # Add skew to the IFMAP demand matrix to reflect systolic pipeline fill
                 if not self.config.sparsity_optimized_mapping:
-                    this_fold_demand = skew_matrix(this_fold_demand, skew_factor)
+                    this_fold_demand = skew_matrix(this_fold_demand,skew_factor)
 
+                ifmap_demand_matrix_list.append(this_fold_demand)
 
-                # Merge with overlap so start-to-start matches the intended gap.
-                overlap = (this_fold_demand.shape[1] - 1) * skew_factor
-                if fr == 0 and fc == 0:
-                    self.ifmap_demand_matrix = this_fold_demand
-                else:
-                    self.ifmap_demand_matrix = overlap_concat(self.ifmap_demand_matrix,
-                                                              this_fold_demand,
-                                                              overlap)
-
-
+        self.ifmap_demand_matrix = np.concatenate(ifmap_demand_matrix_list)
 
         if False:
             if self.config.sparsity_support is True:
@@ -375,9 +347,6 @@ class systolic_compute_ws_sa:
         Method to create filter demand matrix.
         """
         assert self.params_set_flag, 'Parameters are not set'
-
-        inter_fold_gap_between = self.T
-        inter_fold_gap_between_mat = np.ones((inter_fold_gap_between, self.arr_col)) * -1
 
         metadata_conversion_mat = [ [ ] ]
         if False:
@@ -421,12 +390,13 @@ class systolic_compute_ws_sa:
 
                 sum_sparse = sum(list(row).count(-1) for row in this_fold_demand)
 
+                # mod for piped: explicit gap between filter folds (end-to-start)
                 if fr == 0 and fc == 0:
                     pass
                 else:
-                    this_fold_demand = np.concatenate((inter_fold_gap_between_mat, this_fold_demand),
-                                                      axis=0)
-
+                    desired_gap = self.T + (self.arr_row * skew_factor * 2)
+                    gap_mat = np.ones((desired_gap, this_fold_demand.shape[1])) * -1
+                    this_fold_demand = np.concatenate((gap_mat, this_fold_demand), axis=0)
 
                 # Calculate the mapping efficiency
                 row_used = min(self.arr_row, row_end_idx - row_start_id)
@@ -437,9 +407,6 @@ class systolic_compute_ws_sa:
                 mapping_eff_this_fold = \
                     ((self.arr_row * self.arr_col) - sum_sparse) / (self.arr_row * self.arr_col)
 
-                # Skew filter columns to align replacement with in-flight compute
-                this_fold_demand = skew_matrix(this_fold_demand, skew_factor)
-
                 cycles_this_fold = this_fold_demand.shape[0] + this_fold_demand.shape[1] - 1
                 compute_cycles_this_fold = mac_used * self.T
                 compute_util_this_fold = \
@@ -448,16 +415,14 @@ class systolic_compute_ws_sa:
                 self.mapping_efficiency_per_fold.append(mapping_eff_this_fold)
                 self.compute_utility_per_fold.append(compute_util_this_fold)
 
-                # Merge with overlap so start-to-start matches the intended gap.
-                overlap = (this_fold_demand.shape[1] - 1) * skew_factor
-                if fr == 0 and fc == 0:
-                    self.filter_demand_matrix = this_fold_demand
-                else:
-                    self.filter_demand_matrix = overlap_concat(self.filter_demand_matrix,
-                                                               this_fold_demand,
-                                                               overlap)
-
-
+                filter_demand_matrix_list.append(this_fold_demand)
+                #if fr == 0 and fc == 0:
+                #    self.filter_demand_matrix = this_fold_demand
+                #else:
+                #    self.filter_demand_matrix = \
+                #       np.concatenate((self.filter_demand_matrix, this_fold_demand), axis=0)
+        
+        self.filter_demand_matrix = np.concatenate(filter_demand_matrix_list)
 
         if False:
             if self.config.sparsity_support is True:
@@ -475,7 +440,7 @@ class systolic_compute_ws_sa:
 
         inter_fold_gap_prefix = self.arr_row + (self.arr_row * skew_factor)
         inter_fold_gap_prefix_mat = np.ones((inter_fold_gap_prefix, self.arr_col)) * -1
-        inter_fold_gap_between = self.T
+        inter_fold_gap_between = self.arr_row + ((self.arr_row + 1) * skew_factor)
         inter_fold_gap_between_mat = np.ones((inter_fold_gap_between, self.arr_col)) * -1
 
         metadata_conversion_mat = [ [ ] ]
@@ -506,41 +471,27 @@ class systolic_compute_ws_sa:
                     null_req_mat = np.ones((this_fold_demand.shape[0], col_delta)) * -1
                     this_fold_demand = np.concatenate((this_fold_demand, null_req_mat), axis=1)
 
-                # mod for overlap
-                # if fr == 0 and fc == 0:
+                # Now add the prefix matrix
+                # These are the null demands to account for when the operands are streamed in
+                # and the OFMAPS are not ready
                 if fr == 0 and fc == 0:
                     this_fold_demand = np.concatenate((inter_fold_gap_prefix_mat, this_fold_demand),
                                                       axis=0)
                 else:
                     this_fold_demand = np.concatenate((inter_fold_gap_between_mat, this_fold_demand),
                                                       axis=0)
-                                            
-                # Now add the prefix matrix
-                # These are the null demands to account for when the operands are streamed in
-                # and the OFMAPS are not ready
-                # this_fold_demand = np.concatenate((inter_fold_gap_prefix_mat, this_fold_demand),
-                #                                  axis=0)
 
                 # Add skew to the OFMAP demand matrix to reflect systolic pipeline fill
                 this_fold_demand = skew_matrix(this_fold_demand, skew_factor)
 
-                # Merge with overlap so start-to-start matches the intended gap.
-                overlap = (this_fold_demand.shape[1] - 1) * skew_factor
-                if fr == 0 and fc == 0:
-                    self.ofmap_demand_matrix = this_fold_demand
-                else:
-                    self.ofmap_demand_matrix = overlap_concat(self.ofmap_demand_matrix,
-                                                              this_fold_demand,
-                                                              overlap)
-                # if fr == 0 and fc == 0:
-                #     self.ofmap_demand_matrix = this_fold_demand
-                # else:
-                #     self.ofmap_demand_matrix = \
-                #        np.concatenate((self.ofmap_demand_matrix, this_fold_demand), axis=0)
+                ofmap_demand_matrix_list.append(this_fold_demand)
+                #if fr == 0 and fc == 0:
+                #    self.ofmap_demand_matrix = this_fold_demand
+                #else:
+                #    self.ofmap_demand_matrix = \
+                #       np.concatenate((self.ofmap_demand_matrix, this_fold_demand), axis=0)
 
-
-        # self.ofmap_demand_matrix is built via overlap_concat above
-
+        self.ofmap_demand_matrix = np.concatenate(ofmap_demand_matrix_list)
 
         if False:
             if self.config.sparsity_support is True:
@@ -672,7 +623,7 @@ class systolic_compute_ws_sa:
         return self.ofmap_writes
 
 
-#
+#    
 """
 def skew_matrix(input_matrix_np):
 
@@ -713,6 +664,8 @@ def skew_matrix(input_matrix_np, skew_factor):
         out_matrix_np[start:start + rows, c] = input_matrix_np[:, c]
 
     return out_matrix_np
+
+
 
 #
 def skew_matrix_row_sparsity(input_matrix, arr_row, block_size):
@@ -755,7 +708,7 @@ def skew_matrix_row_sparsity(input_matrix, arr_row, block_size):
     
     return np.array(output_matrix, dtype=input_matrix.dtype)
 
-# mod for overlap
+# mod for piped
 def overlap_concat(prev, nxt, overlap):
     """
     prev, nxt: 2D numpy arrays with -1 as null.
