@@ -48,11 +48,13 @@ class scale_config:
         self.filter_sram_bank_port = 2
 
         self.valid_df_list = ['os', 'ws', 'is', 'os_piped', 'ws_piped', 'is_piped', 
-                            'os_overlap', 'ws_overlap','is_overlap','os_sa','ws_sa','is_sa', 
-                            'os_sa_f2', 'ws_sa_f2', 'is_sa_f2', 
-                            'os_sa_f4', 'ws_sa_f4', 'is_sa_f4', 
-                            'os_piped_f2', 'ws_piped_f2', 'is_piped_f2', 
-                            'os_piped_f4', 'ws_piped_f4', 'is_piped_f4', 'test']
+                            'os_overlap', 'ws_overlap','is_overlap','os_sa','ws_sa','is_sa',
+                            'ws_ac', 'ws_piped_ac', 'ws_overlap_ac', 'ws_sa_ac',
+                            'ws_overlap_ac_db', 'ws_sa_ac_db',
+                            'os_sa_f2', 'ws_sa_f2', 'is_sa_f2', 'ws_sa_f2_ac', 'ws_sa_f2_ac_db',
+                            'os_sa_f4', 'ws_sa_f4', 'is_sa_f4', 'ws_sa_f4_ac', 'ws_sa_f4_ac_db',
+                            'os_piped_f2', 'ws_piped_f2', 'is_piped_f2', 'ws_piped_f2_ac',
+                            'os_piped_f4', 'ws_piped_f4', 'is_piped_f4', 'ws_piped_f4_ac', 'test']
 
         self.sparsity_support = False
         self.sparsity_representation = ""

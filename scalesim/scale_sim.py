@@ -171,42 +171,66 @@ class scalesim:
             df_string = "Output Stationary piped"
         elif df == 'ws_piped':
             df_string = "Weight Stationary piped"
+        elif df == 'ws_piped_ac':
+            df_string = "Weight Stationary piped (accumulation)"
         elif df == 'is_piped':
             df_string = "Input Stationary piped"
         elif df == 'os_overlap':
             df_string = "Output Stationary overlap"
         elif df == 'ws_overlap':
             df_string = "Weight Stationary overlap"
+        elif df == 'ws_overlap_ac':
+            df_string = "Weight Stationary overlap (accumulation)"
+        elif df == 'ws_overlap_ac_db':
+            df_string = "Weight Stationary overlap (accumulation db)"
         elif df == 'is_overlap':
             df_string = "Input Stationary overlap"
         elif df == 'os_sa':
             df_string = "Output Stationary sa"
         elif df == 'ws_sa':
             df_string = "Weight Stationary sa"
+        elif df == 'ws_ac':
+            df_string = "Weight Stationary (accumulation)"
+        elif df == 'ws_sa_ac':
+            df_string = "Weight Stationary sa (accumulation)"
+        elif df == 'ws_sa_ac_db':
+            df_string = "Weight Stationary sa (accumulation db)"
         elif df == 'is_sa':
             df_string = "Input Stationary sa"
         elif df == 'os_sa_f2':
             df_string = "Output Stationary sa 2-stage"
         elif df == 'ws_sa_f2':
             df_string = "Weight Stationary sa 2-stage"
+        elif df == 'ws_sa_f2_ac':
+            df_string = "Weight Stationary sa 2-stage (accumulation)"
+        elif df == 'ws_sa_f2_ac_db':
+            df_string = "Weight Stationary sa 2-stage (accumulation db)"
         elif df == 'is_sa_f2':
             df_string = "Input Stationary sa 2-stage"      
         elif df == 'os_sa_f4':
             df_string = "Output Stationary sa 4-stage"
         elif df == 'ws_sa_f4':
             df_string = "Weight Stationary sa 4-stage"
+        elif df == 'ws_sa_f4_ac':
+            df_string = "Weight Stationary sa 4-stage (accumulation)"
+        elif df == 'ws_sa_f4_ac_db':
+            df_string = "Weight Stationary sa 4-stage (accumulation db)"
         elif df == 'is_sa_f4':
             df_string = "Input Stationary sa 4-stage"
         elif df == 'os_piped_f2':
             df_string = "Output Stationary piped 2-stage"
         elif df == 'ws_piped_f2':
             df_string = "Weight Stationary piped 2-stage"
+        elif df == 'ws_piped_f2_ac':
+            df_string = "Weight Stationary piped 2-stage (accumulation)"
         elif df == 'is_piped_f2':
             df_string = "Input Stationary piped 2-stage"
         elif df == 'os_piped_f4':
             df_string = "Output Stationary piped 4-stage"
         elif df == 'ws_piped_f4':
             df_string = "Weight Stationary piped 4-stage"
+        elif df == 'ws_piped_f4_ac':
+            df_string = "Weight Stationary piped 4-stage (accumulation)"
         elif df == 'is_piped_f4':
             df_string = "Input Stationary piped 4-stage"              
         elif df == 'test':

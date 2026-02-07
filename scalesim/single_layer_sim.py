@@ -18,8 +18,14 @@ from scalesim.compute.systolic_compute_os_overlap import systolic_compute_os_ove
 from scalesim.compute.systolic_compute_os_sa import systolic_compute_os_sa
 from scalesim.compute.systolic_compute_ws import systolic_compute_ws
 from scalesim.compute.systolic_compute_ws_piped import systolic_compute_ws_piped
+from scalesim.compute.systolic_compute_ws_piped_ac import systolic_compute_ws_piped_ac
 from scalesim.compute.systolic_compute_ws_overlap import systolic_compute_ws_overlap
+from scalesim.compute.systolic_compute_ws_overlap_ac import systolic_compute_ws_overlap_ac
+from scalesim.compute.systolic_compute_ws_overlap_ac_db import systolic_compute_ws_overlap_ac_db
 from scalesim.compute.systolic_compute_ws_sa import systolic_compute_ws_sa
+from scalesim.compute.systolic_compute_ws_sa_ac import systolic_compute_ws_sa_ac
+from scalesim.compute.systolic_compute_ws_sa_ac_db import systolic_compute_ws_sa_ac_db
+from scalesim.compute.systolic_compute_ws_ac import systolic_compute_ws_ac
 from scalesim.compute.systolic_compute_is import systolic_compute_is
 from scalesim.compute.systolic_compute_is_piped import systolic_compute_is_piped
 from scalesim.compute.systolic_compute_is_sa import systolic_compute_is_sa
@@ -39,6 +45,12 @@ from scalesim.compute.systolic_compute_ws_piped_f2 import systolic_compute_ws_pi
 from scalesim.compute.systolic_compute_ws_piped_f4 import systolic_compute_ws_piped_f4
 from scalesim.compute.systolic_compute_ws_sa_f2 import systolic_compute_ws_sa_f2
 from scalesim.compute.systolic_compute_ws_sa_f4 import systolic_compute_ws_sa_f4
+from scalesim.compute.systolic_compute_ws_piped_f2_ac import systolic_compute_ws_piped_f2_ac
+from scalesim.compute.systolic_compute_ws_piped_f4_ac import systolic_compute_ws_piped_f4_ac
+from scalesim.compute.systolic_compute_ws_sa_f2_ac import systolic_compute_ws_sa_f2_ac
+from scalesim.compute.systolic_compute_ws_sa_f4_ac import systolic_compute_ws_sa_f4_ac
+from scalesim.compute.systolic_compute_ws_sa_f2_ac_db import systolic_compute_ws_sa_f2_ac_db
+from scalesim.compute.systolic_compute_ws_sa_f4_ac_db import systolic_compute_ws_sa_f4_ac_db
 
 class single_layer_sim:
     """
@@ -157,42 +169,66 @@ class single_layer_sim:
             self.compute_system = systolic_compute_is_piped()
         elif self.dataflow == 'ws_piped':
             self.compute_system = systolic_compute_ws_piped()
+        elif self.dataflow == 'ws_piped_ac':
+            self.compute_system = systolic_compute_ws_piped_ac()
         elif self.dataflow == 'os_overlap':
             self.compute_system = systolic_compute_os_overlap()
         elif self.dataflow == 'is_overlap':
             self.compute_system = systolic_compute_is_overlap()
         elif self.dataflow == 'ws_overlap':
             self.compute_system = systolic_compute_ws_overlap()
+        elif self.dataflow == 'ws_overlap_ac':
+            self.compute_system = systolic_compute_ws_overlap_ac()
+        elif self.dataflow == 'ws_overlap_ac_db':
+            self.compute_system = systolic_compute_ws_overlap_ac_db()
         elif self.dataflow == 'os_sa':
             self.compute_system = systolic_compute_os_sa()
         elif self.dataflow == 'is_sa':
             self.compute_system = systolic_compute_is_sa()
         elif self.dataflow == 'ws_sa':
             self.compute_system = systolic_compute_ws_sa()
+        elif self.dataflow == 'ws_ac':
+            self.compute_system = systolic_compute_ws_ac()
+        elif self.dataflow == 'ws_sa_ac':
+            self.compute_system = systolic_compute_ws_sa_ac()
+        elif self.dataflow == 'ws_sa_ac_db':
+            self.compute_system = systolic_compute_ws_sa_ac_db()
         elif self.dataflow == 'os_sa_f2':
             self.compute_system = systolic_compute_os_sa_f2()
         elif self.dataflow == 'is_sa_f2':
             self.compute_system = systolic_compute_is_sa_f2()
         elif self.dataflow == 'ws_sa_f2':
             self.compute_system = systolic_compute_ws_sa_f2()
+        elif self.dataflow == 'ws_sa_f2_ac':
+            self.compute_system = systolic_compute_ws_sa_f2_ac()
+        elif self.dataflow == 'ws_sa_f2_ac_db':
+            self.compute_system = systolic_compute_ws_sa_f2_ac_db()
         elif self.dataflow == 'os_sa_f4':
             self.compute_system = systolic_compute_os_sa_f4()
         elif self.dataflow == 'is_sa_f4':
             self.compute_system = systolic_compute_is_sa_f4()
         elif self.dataflow == 'ws_sa_f4':
             self.compute_system = systolic_compute_ws_sa_f4()
+        elif self.dataflow == 'ws_sa_f4_ac':
+            self.compute_system = systolic_compute_ws_sa_f4_ac()
+        elif self.dataflow == 'ws_sa_f4_ac_db':
+            self.compute_system = systolic_compute_ws_sa_f4_ac_db()
         elif self.dataflow == 'os_piped_f2':
             self.compute_system = systolic_compute_os_piped_f2()
         elif self.dataflow == 'is_piped_f2':
             self.compute_system = systolic_compute_is_piped_f2()
         elif self.dataflow == 'ws_piped_f2':
             self.compute_system = systolic_compute_ws_piped_f2()
+        elif self.dataflow == 'ws_piped_f2_ac':
+            self.compute_system = systolic_compute_ws_piped_f2_ac()
         elif self.dataflow == 'os_piped_f4':
             self.compute_system = systolic_compute_os_piped_f4()
         elif self.dataflow == 'is_piped_f4':
             self.compute_system = systolic_compute_is_piped_f4()
         elif self.dataflow == 'ws_piped_f4':
             self.compute_system = systolic_compute_ws_piped_f4()
+        elif self.dataflow == 'ws_piped_f4_ac':
+            self.compute_system = systolic_compute_ws_piped_f4_ac()
 
 
         arr_dims = self.config.get_array_dims()
