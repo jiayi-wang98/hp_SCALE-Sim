@@ -1,0 +1,212 @@
+命令大全
+python3 ./scalesim/scale.py -c ./configs/scale.cfg -t ./topologies/conv_nets/yolo_tiny.csv -p ../result/
+python3 ./scalesim/scale.py -c ./configs/eyeriss.cfg -t ./topologies/conv_nets/yolo_tiny_layer1.csv -p ../result/1215/3
+
+google_ramulator 需要单独的ramulator文件
+python3 -u -m scalesim.scale -c ./configs/google.cfg -t ./topologies/conv_nets/yolo_tiny.csv -p /data2/chenyi9/ScaleResult/0119/tpu_v1_ori 2>&1 | tee /data2/chenyi9/ScaleResult/0119/tpu_v1_ori/log.txt
+
+python3 ./scalesim/scale.py -c ./configs/sparsity.cfg -t ./topologies/conv_nets/yolo_tiny_layer1.csv -p ../result/1215/4
+
+
+piped comments
+python3 -m scalesim.scale -c ./configs/eyeriss_based_test.cfg -t ./topologies/conv_nets/yolo_tiny.csv -p ../result/0117/os_piped_4
+
+
+
+result file
+/data2/chenyi9/ScaleResult/0119/tpu
+
+
+source /home/chenyi9/Computer/C/envs/scalesim_env/bin/activate
+
+
+
+
+yolo
+is
+python3 -u -m scalesim.scale -c ./configs/google_is.cfg -t ./topologies/conv_nets/yolo_tiny.csv -p /data2/chenyi9/ScaleResult/0119/tpu_v1_is 2>&1 | tee /data2/chenyi9/ScaleResult/0119/tpu_v1_is/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/google_is_piped.cfg -t ./topologies/conv_nets/yolo_tiny.csv -p /data2/chenyi9/ScaleResult/0119/tpu_v1_is_piped 2>&1 | tee /data2/chenyi9/ScaleResult/0119/tpu_v1_is_piped/log.txt
+
+
+ws
+python3 -u -m scalesim.scale -c ./configs/google_ws.cfg -t ./topologies/conv_nets/yolo_tiny.csv -p /data2/chenyi9/ScaleResult/0119/tpu_v1_ws 2>&1 | tee /data2/chenyi9/ScaleResult/0119/tpu_v1_ws/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/google_ws_piped.cfg -t ./topologies/conv_nets/yolo_tiny.csv -p /data2/chenyi9/ScaleResult/0119/tpu_v1_ws_piped 2>&1 | tee /data2/chenyi9/ScaleResult/0119/tpu_v1_ws_piped/log.txt
+
+
+os
+python3 -u -m scalesim.scale -c ./configs/google.cfg -t ./topologies/conv_nets/yolo_tiny.csv -p /data2/chenyi9/ScaleResult/0119/tpu_v1_ori 2>&1 | tee /data2/chenyi9/ScaleResult/0119/tpu_v1_ori/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/google_os_piped.cfg -t ./topologies/conv_nets/yolo_tiny.csv -p /data2/chenyi9/ScaleResult/0119/tpu_v1_os_piped 2>&1 | tee /data2/chenyi9/ScaleResult/0119/tpu_v1_os_piped/log.txt
+
+
+gnmt tpu  0119_2
+is
+python3 -u -m scalesim.scale -c ./configs/google_is.cfg -t ./topologies/GEMM_mnk/gnmt.csv  -i gemm -p /data2/chenyi9/ScaleResult/0119_2/tpu_v1_is 2>&1 | tee /data2/chenyi9/ScaleResult/0119_2/tpu_v1_is/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/google_is_piped.cfg -t ./topologies/GEMM_mnk/gnmt.csv -i gemm  -p /data2/chenyi9/ScaleResult/0119_2/tpu_v1_is_piped 2>&1 | tee /data2/chenyi9/ScaleResult/0119_2/tpu_v1_is_piped/log.txt
+
+
+ws
+python3 -u -m scalesim.scale -c ./configs/google_ws.cfg -t ./topologies/GEMM_mnk/gnmt.csv  -i gemm -p /data2/chenyi9/ScaleResult/0119_2/tpu_v1_ws 2>&1 | tee /data2/chenyi9/ScaleResult/0119_2/tpu_v1_ws/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/google_ws_piped.cfg -t ./topologies/GEMM_mnk/gnmt.csv -i gemm  -p /data2/chenyi9/ScaleResult/0119_2/tpu_v1_ws_piped 2>&1 | tee /data2/chenyi9/ScaleResult/0119_2/tpu_v1_ws_piped/log.txt
+
+
+os
+python3 -u -m scalesim.scale -c ./configs/google.cfg -t ./topologies/GEMM_mnk/gnmt.csv -i gemm  -p /data2/chenyi9/ScaleResult/0119_2/tpu_v1_ori 2>&1 | tee /data2/chenyi9/ScaleResult/0119_2/tpu_v1_ori/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/google_os_piped.cfg -t ./topologies/GEMM_mnk/gnmt.csv  -i gemm -p /data2/chenyi9/ScaleResult/0119_2/tpu_v1_os_piped 2>&1 | tee /data2/chenyi9/ScaleResult/0119_2/tpu_v1_os_piped/log.txt
+
+
+gpt2 tpu  0119_3
+is 
+python3 -u -m scalesim.scale -c ./configs/google_is.cfg -t ./topologies/GEMM_mnk/gpt2.csv  -i gemm -p /data2/chenyi9/ScaleResult/0119_3/tpu_v1_is 2>&1 | tee /data2/chenyi9/ScaleResult/0119_3/tpu_v1_is/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/google_is_piped.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm  -p /data2/chenyi9/ScaleResult/0119_3/tpu_v1_is_piped 2>&1 | tee /data2/chenyi9/ScaleResult/0119_3/tpu_v1_is_piped/log.txt
+
+
+ws
+python3 -u -m scalesim.scale -c ./configs/google_ws.cfg -t ./topologies/GEMM_mnk/gpt2.csv  -i gemm -p /data2/chenyi9/ScaleResult/0119_3/tpu_v1_ws 2>&1 | tee /data2/chenyi9/ScaleResult/0119_3/tpu_v1_ws/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/google_ws_piped.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm  -p /data2/chenyi9/ScaleResult/0119_3/tpu_v1_ws_piped 2>&1 | tee /data2/chenyi9/ScaleResult/0119_3/tpu_v1_ws_piped/log.txt
+
+
+os
+python3 -u -m scalesim.scale -c ./configs/google.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm  -p /data2/chenyi9/ScaleResult/0119_3/tpu_v1_ori 2>&1 | tee /data2/chenyi9/ScaleResult/0119_3/tpu_v1_ori/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/google_os_piped.cfg -t ./topologies/GEMM_mnk/gpt2.csv  -i gemm -p /data2/chenyi9/ScaleResult/0119_3/tpu_v1_os_piped 2>&1 | tee /data2/chenyi9/ScaleResult/0119_3/tpu_v1_os_piped/log.txt
+
+
+
+gpt2 tpuv1 0119_4
+
+python3 -u -m scalesim.scale -c ./configs/google.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -l ./layouts/GEMM_mnk/vit_l_MK_KN.csv -p /data2/chenyi9/ScaleResult/0119_4/tpu_v1_ori 2>&1 | tee /data2/chenyi9/ScaleResult/0119_4/tpu_v1_ori/log.txt
+
+
+python3 -u -m scalesim.scale -c ./configs/google_os_piped.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -l ./layouts/GEMM_mnk/vit_l_MK_KN.csv -p /data2/chenyi9/ScaleResult/0119_4/tpu_v1_os_piped 2>&1 | tee /data2/chenyi9/ScaleResult/0119_4/tpu_v1_os_piped/log.txt
+
+
+gpt2 tpuv1 0119_5  BW 48 layout 10,10
+python3 -u -m scalesim.scale -c ./configs/google.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm  -p /data2/chenyi9/ScaleResult/0119_5/tpu_v1_ori 2>&1 | tee /data2/chenyi9/ScaleResult/0119_5/tpu_v1_ori/log.txt
+
+
+
+gpt2 tpuv1 0119_6  BW 48 layout 50,50
+python3 -u -m scalesim.scale -c ./configs/google.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -l ./layouts/GEMM_mnk/vit_l_MK_KN.csv -p /data2/chenyi9/ScaleResult/0119_6/tpu_v1_ori 2>&1 | tee /data2/chenyi9/ScaleResult/0119_6/tpu_v1_ori/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/google_os_piped.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -l ./layouts/GEMM_mnk/vit_l_MK_KN.csv -p /data2/chenyi9/ScaleResult/0119_6/tpu_v1_os_piped 2>&1 | tee /data2/chenyi9/ScaleResult/0119_6/tpu_v1_os_piped/log.txt
+
+
+gpt2 tpuv1 0119_7  BW 1000 layout 1000,1000
+python3 -u -m scalesim.scale -c ./configs/google.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -l ./layouts/GEMM_mnk/vit_l_MK_KN.csv -p /data2/chenyi9/ScaleResult/0119_7/tpu_v1_os 2>&1 | tee /data2/chenyi9/ScaleResult/0119_7/tpu_v1_os/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/google_os_piped.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -l ./layouts/GEMM_mnk/vit_l_MK_KN.csv -p /data2/chenyi9/ScaleResult/0119_7/tpu_v1_os_piped 2>&1 | tee /data2/chenyi9/ScaleResult/0119_7/tpu_v1_os_piped/log.txt
+
+gpt2 tpuv1 0119_8  BW 100000 layout 100000,100000
+python3 -u -m scalesim.scale -c ./configs/google.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -l ./layouts/GEMM_mnk/vit_l_MK_KN.csv -p /data2/chenyi9/ScaleResult/0119_8/tpu_v1_os 2>&1 | tee /data2/chenyi9/ScaleResult/0119_8/tpu_v1_os/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/google_os_piped.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -l ./layouts/GEMM_mnk/vit_l_MK_KN.csv -p /data2/chenyi9/ScaleResult/0119_8/tpu_v1_os_piped 2>&1 | tee /data2/chenyi9/ScaleResult/0119_8/tpu_v1_os_piped/log.txt
+
+1.20 警告警告，任何1.20 之前的材料，pipeline 和overlap写反了！！！  脑子糊涂了！！！
+1.20 警告警告，任何1.20 之前的ws和is的结果都不靠谱
+
+
+gpt2 tpuv1 is 0120_1 BW 50 layout 1000 1000
+python3 -u -m scalesim.scale -c ./configs/google_is.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -l ./layouts/GEMM_mnk/vit_l_MK_KN.csv -p /data2/chenyi9/ScaleResult/0120_1/tpu_v1_is 2>&1 | tee /data2/chenyi9/ScaleResult/0120_1/tpu_v1_is/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/google_is_overlap.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -l ./layouts/GEMM_mnk/vit_l_MK_KN.csv -p /data2/chenyi9/ScaleResult/0120_1/tpu_v1_is_overlap 2>&1 | tee /data2/chenyi9/ScaleResult/0120_1/tpu_v1_is_overlap/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/google_is_piped.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -l ./layouts/GEMM_mnk/vit_l_MK_KN.csv -p /data2/chenyi9/ScaleResult/0120_1/tpu_v1_is_piped 2>&1 | tee /data2/chenyi9/ScaleResult/0120_1/tpu_v1_is_piped/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/google_is_sa.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -l ./layouts/GEMM_mnk/vit_l_MK_KN.csv -p /data2/chenyi9/ScaleResult/0120_1/tpu_v1_is_sa 2>&1 | tee /data2/chenyi9/ScaleResult/0120_1/tpu_v1_is_sa/log.txt
+
+
+
+
+
+gpt2 tpuv1 ws 0120_2 BW 50 layout 256 256
+python3 -u -m scalesim.scale -c ./configs/google_ws.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -l ./layouts/GEMM_mnk/vit_l_MK_KN.csv -p /data2/chenyi9/ScaleResult/0120_2/tpu_v1_ws 2>&1 | tee /data2/chenyi9/ScaleResult/0120_2/tpu_v1_ws/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/google_ws_overlap.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -l ./layouts/GEMM_mnk/vit_l_MK_KN.csv -p /data2/chenyi9/ScaleResult/0120_2/tpu_v1_ws_overlap 2>&1 | tee /data2/chenyi9/ScaleResult/0120_2/tpu_v1_ws_overlap/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/google_ws_piped.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -l ./layouts/GEMM_mnk/vit_l_MK_KN.csv -p /data2/chenyi9/ScaleResult/0120_2/tpu_v1_ws_piped 2>&1 | tee /data2/chenyi9/ScaleResult/0120_2/tpu_v1_ws_piped/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/google_ws_sa.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -l ./layouts/GEMM_mnk/vit_l_MK_KN.csv -p /data2/chenyi9/ScaleResult/0120_2/tpu_v1_ws_sa 2>&1 | tee /data2/chenyi9/ScaleResult/0120_2/tpu_v1_ws_sa/log.txt
+
+
+gpt2 tpuv1 os 0120_3 BW 50 layout 256 256
+python3 -u -m scalesim.scale -c ./configs/google_os.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -l ./layouts/GEMM_mnk/vit_l_MK_KN.csv -p /data2/chenyi9/ScaleResult/0120_3/tpu_v1_os 2>&1 | tee /data2/chenyi9/ScaleResult/0120_3/tpu_v1_os/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/google_os_overlap.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -l ./layouts/GEMM_mnk/vit_l_MK_KN.csv -p /data2/chenyi9/ScaleResult/0120_3/tpu_v1_os_overlap 2>&1 | tee /data2/chenyi9/ScaleResult/0120_3/tpu_v1_os_overlap/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/google_os_piped.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -l ./layouts/GEMM_mnk/vit_l_MK_KN.csv -p /data2/chenyi9/ScaleResult/0120_3/tpu_v1_os_piped 2>&1 | tee /data2/chenyi9/ScaleResult/0120_3/tpu_v1_os_piped/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/google_os_sa.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -l ./layouts/GEMM_mnk/vit_l_MK_KN.csv -p /data2/chenyi9/ScaleResult/0120_3/tpu_v1_os_sa 2>&1 | tee /data2/chenyi9/ScaleResult/0120_3/tpu_v1_os_sa/log.txt
+
+
+
+gpt2 tpuv5e os 0123_1 BW 60 layout 1024 1024 32 1
+python3 -u -m scalesim.scale -c ./configs/tpuv5e_os.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -p /data2/chenyi9/ScaleResult/0123_1/tpu_v5e_os 2>&1 | tee  /data2/chenyi9/ScaleResult/0123_1/tpu_v5e_os/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/tpuv5e_os_overlap.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -p  /data2/chenyi9/ScaleResult/0123_1/tpu_v5e_os_overlap 2>&1 | tee /data2/chenyi9/ScaleResult/0123_1/tpu_v5e_os_overlap/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/tpuv5e_os_piped.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -p /data2/chenyi9/ScaleResult/0123_1/tpu_v5e_os_piped 2>&1 | tee /data2/chenyi9/ScaleResult/0123_1/tpu_v5e_os_piped/log.txt
+
+python3 -u -m scalesim.scale -c ./configs/tpuv5e_os_sa.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -p /data2/chenyi9/ScaleResult/0123_1/tpu_v5e_os_sa 2>&1 | tee /data2/chenyi9/ScaleResult/0123_1/tpu_v5e_os_sa/log.txt
+
+
+
+
+
+
+
+防止进度条刷屏的
+
+python3 -u -m scalesim.scale -c ./configs/google_is_sa.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -l ./layouts/GEMM_mnk/vit_l_MK_KN.csv -p /data2/chenyi9/ScaleResult/0120_1/tpu_v1_is_sa 2>/dev/tty | tee /data2/chenyi9/ScaleResult/0120_1/tpu_v1_is_sa/log.txt
+
+
+
+mkdir -p /data2/chenyi9/ScaleResult/0123_3/tpuv5e_os && python3 -m scalesim.scale -c ./configs/tpuv5e_os.cfg -t ./topologies/GEMM_mnk/gpt2.csv -i gemm -p /data2/chenyi9/ScaleResult/0123_3/tpuv5e_os -s N 2>&1 | tee /data2/chenyi9/ScaleResult/0123_3/tpuv5e_os/log.txt
+
+
+
+
+df -h /data2
+
+df -h /home
+
+du -sh /data2/chenyi9
+du -sh ~
+
+tar -czf 0119_2.tar.gz 0119_2
+scp chenyi9@squire.ece.uw.edu:/data2/chenyi9/ScaleResult/0119_2.tar.gz D:\Downloads\
+
+
+mkdir /data2/chenyi9/ScaleResult/0120
+
+tmux kill-server
+tmux ls 
+tmux new -s 1
+tmux a -t 1
+
+
+rm -rf -- 0123_5/*
+
+source /home/chenyi9/Computer/C/envs/scalesim_env/bin/activate
+source /home/chenyi9/Computer/C/envs/general/bin/activate
+
+0124 修改日历
+1. 把ofmap的if fc == 0 删掉，强制加入gap
+2. 修改gap生成大小，-1 改为 -Drain time
+3. 修改之前overlap强制加入cycle的操作（因为本来加入了gap就是加入个cycle没必要再重复加了）
+4. 现在似乎跑不了小矩阵，如果D 比较大，那么似乎就不行了（对吗）
+
+0125 修改日志
+1. mod start compute util
+
+code -n /data2/chenyi9
+
+
+bash run_tmux_jobs.sh

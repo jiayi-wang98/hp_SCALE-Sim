@@ -47,6 +47,8 @@ class scale_config:
         self.filter_sram_bank_num = 10
         self.filter_sram_bank_port = 2
 
+        self.word_size_bytes = 1  # NOTE: Word size in bytes (e.g., 1=int8, 2=bf16, 4=fp32)
+
         self.valid_df_list = ['os', 'ws', 'is', 'os_piped', 'ws_piped', 'is_piped', 
                             'os_overlap', 'ws_overlap','is_overlap','os_sa','ws_sa','is_sa',
                             'ws_ac', 'ws_piped_ac', 'ws_overlap_ac', 'ws_sa_ac',
@@ -110,6 +112,8 @@ class scale_config:
         self.ifmap_offset = int(config.get(section, 'IfmapOffset'))
         self.filter_offset = int(config.get(section, 'FilterOffset'))
         self.ofmap_offset = int(config.get(section, 'OfmapOffset'))
+        if config.has_option(section, 'WordSizeBytes'):
+            self.word_size_bytes = int(config.get(section, 'WordSizeBytes'))  # NOTE: Configurable word size in bytes
         self.df = config.get(section, 'Dataflow')
         self.req_buf_sz_rd = int(config.get(section, 'ReadRequestBuffer')) // div_factor
         self.req_buf_sz_wr = int(config.get(section, 'WriteRequestBuffer')) // div_factor
@@ -190,6 +194,8 @@ class scale_config:
 
         if len(conf_list) == 15:
             self.topofile = conf_list[14]
+        if len(conf_list) >= 16:
+            self.word_size_bytes = int(conf_list[15])  # NOTE: Optional word size in bytes
 
         self.valid_conf_flag = True
 
@@ -220,6 +226,7 @@ class scale_config:
         config.set(section, 'IfmapOffset', str(self.ifmap_offset))
         config.set(section, 'FilterOffset', str(self.filter_offset))
         config.set(section, 'OfmapOffset', str(self.ofmap_offset))
+        config.set(section, 'WordSizeBytes', str(self.word_size_bytes))  # NOTE: Emit word size in bytes
 
         config.set(section, 'Dataflow', str(self.df))
         config.set(section, 'Bandwidth', ','.join([str(x) for x in self.bandwidths]))
@@ -408,6 +415,19 @@ class scale_config:
             return
 
         return self.ifmap_sz_kb, self.filter_sz_kb, self.ofmap_sz_kb
+
+    def get_word_size_bytes(self):
+        """
+        Method to get the word size in bytes.
+        """
+        me = 'scale_config.' + 'get_word_size_bytes()'
+
+        if not self.valid_conf_flag:
+            message = 'ERROR: ' + me
+            message += 'Config is not valid. Not returning any values'
+            return
+
+        return self.word_size_bytes  # NOTE: Configurable word size in bytes
 
     #
     def get_offsets(self):
