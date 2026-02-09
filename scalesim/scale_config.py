@@ -48,6 +48,7 @@ class scale_config:
         self.filter_sram_bank_port = 2
 
         self.word_size_bytes = 1  # NOTE: Word size in bytes (e.g., 1=int8, 2=bf16, 4=fp32)
+        self.total_dram_bandwidth = 0  # NOTE: Total DRAM bandwidth cap (words/cycle), 0 disables
 
         self.valid_df_list = ['os', 'ws', 'is', 'os_piped', 'ws_piped', 'is_piped', 
                             'os_overlap', 'ws_overlap','is_overlap','os_sa','ws_sa','is_sa',
@@ -114,6 +115,8 @@ class scale_config:
         self.ofmap_offset = int(config.get(section, 'OfmapOffset'))
         if config.has_option(section, 'WordSizeBytes'):
             self.word_size_bytes = int(config.get(section, 'WordSizeBytes'))  # NOTE: Configurable word size in bytes
+        if config.has_option(section, 'TotalDramBandwidth'):
+            self.total_dram_bandwidth = int(config.get(section, 'TotalDramBandwidth'))  # NOTE: Global DRAM bandwidth cap
         self.df = config.get(section, 'Dataflow')
         self.req_buf_sz_rd = int(config.get(section, 'ReadRequestBuffer')) // div_factor
         self.req_buf_sz_wr = int(config.get(section, 'WriteRequestBuffer')) // div_factor
@@ -196,6 +199,8 @@ class scale_config:
             self.topofile = conf_list[14]
         if len(conf_list) >= 16:
             self.word_size_bytes = int(conf_list[15])  # NOTE: Optional word size in bytes
+        if len(conf_list) >= 17:
+            self.total_dram_bandwidth = int(conf_list[16])  # NOTE: Optional total DRAM bandwidth cap
 
         self.valid_conf_flag = True
 
@@ -227,6 +232,7 @@ class scale_config:
         config.set(section, 'FilterOffset', str(self.filter_offset))
         config.set(section, 'OfmapOffset', str(self.ofmap_offset))
         config.set(section, 'WordSizeBytes', str(self.word_size_bytes))  # NOTE: Emit word size in bytes
+        config.set(section, 'TotalDramBandwidth', str(self.total_dram_bandwidth))  # NOTE: Emit total DRAM bandwidth cap
 
         config.set(section, 'Dataflow', str(self.df))
         config.set(section, 'Bandwidth', ','.join([str(x) for x in self.bandwidths]))
@@ -428,6 +434,19 @@ class scale_config:
             return
 
         return self.word_size_bytes  # NOTE: Configurable word size in bytes
+
+    def get_total_dram_bandwidth(self):
+        """
+        Method to get the total DRAM bandwidth cap in words/cycle.
+        """
+        me = 'scale_config.' + 'get_total_dram_bandwidth()'
+
+        if not self.valid_conf_flag:
+            message = 'ERROR: ' + me
+            message += 'Config is not valid. Not returning any values'
+            return
+
+        return self.total_dram_bandwidth  # NOTE: Global DRAM bandwidth cap
 
     #
     def get_offsets(self):

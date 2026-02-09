@@ -4,6 +4,7 @@ External DRAM write requests serviced by Ramulator
 import numpy as np
 from scalesim.scale_config import scale_config as config
 from bisect import bisect_left
+from scalesim.memory.dram_arbiter import DramArbiter
 
 # This is shell module to ensure continuity
 
@@ -26,6 +27,8 @@ class write_port:
         self.request_array = []
         self.count = 0
         self.config = config()
+        self.arbiter = None  # NOTE: Optional global DRAM arbiter
+        self.port_name = "unknown"  # NOTE: Port identifier for arbitration logs
     
     def def_params( self,
                     config = config(),
@@ -43,6 +46,13 @@ class write_port:
             self.latency_matrix = np.load(latency_file)
         self.latency=0
     #
+
+    def set_arbiter(self, arbiter, port_name="unknown"):
+        """
+        Method to attach a global DRAM arbiter.
+        """
+        self.arbiter = arbiter  # NOTE: Shared arbiter enforces total DRAM bandwidth
+        self.port_name = str(port_name)  # NOTE: Tag requests with a human-readable source name
 
     def find_latency(self):
         """
@@ -67,6 +77,13 @@ class write_port:
         Ramulator.
         """
         if self.ramulator_trace == False:
+            if self.arbiter is not None and isinstance(self.arbiter, DramArbiter):
+                arrival_cycles = [int(x[0]) for x in incoming_cycles_arr_np]
+                request_sizes = [int(np.sum(row != -1)) for row in incoming_requests_arr_np]
+                priorities = [1 for _ in arrival_cycles]  # NOTE: Writes are lower priority
+                sources = [self.port_name for _ in arrival_cycles]  # NOTE: Tag source for trace logging
+                out_cycles = self.arbiter.service_requests(arrival_cycles, request_sizes, extra_latency=self.latency, priorities=priorities, sources=sources)
+                return np.asarray(out_cycles).reshape((len(out_cycles), 1))  # NOTE: FCFS DRAM arbitration
             out_cycles_arr_np = incoming_cycles_arr_np + self.latency
             out_cycles_arr_np = out_cycles_arr_np.reshape((out_cycles_arr_np.shape[0], 1))
             return out_cycles_arr_np

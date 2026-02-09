@@ -15,6 +15,7 @@ from scalesim.memory.read_buffer_estimate_bw import ReadBufferEstimateBw as rdbu
 from scalesim.memory.read_port import read_port as rdport
 from scalesim.memory.write_buffer import write_buffer as wrbuf
 from scalesim.memory.write_port import write_port as wrport
+from scalesim.memory.dram_arbiter import DramArbiter
 
 class double_buffered_scratchpad:
     """
@@ -35,6 +36,7 @@ class double_buffered_scratchpad:
         self.ifmap_port = rdport()
         self.filter_port = rdport()
         self.ofmap_port = wrport()
+        self.dram_arbiter = None  # NOTE: Optional global DRAM arbiter
         self.config = cfg()
         self.topo = topo()
 
@@ -87,6 +89,7 @@ class double_buffered_scratchpad:
                    ifmap_buf_size_bytes=2, filter_buf_size_bytes=2, ofmap_buf_size_bytes=2,
                    rd_buf_active_frac=0.5, wr_buf_active_frac=0.5,
                    ifmap_backing_buf_bw=1, filter_backing_buf_bw=1, ofmap_backing_buf_bw=1,
+                   total_dram_bw=0,
                    ifmap_sram_bank_num=1, ifmap_sram_bank_port=2, filter_sram_bank_num=1, filter_sram_bank_port=2,
                    using_ifmap_custom_layout=False, using_filter_custom_layout=False,
                    config=cfg(), topo=topo()
@@ -101,6 +104,10 @@ class double_buffered_scratchpad:
         self.use_ramulator_trace = config.get_ramulator_trace()
 
         self.estimate_bandwidth_mode = estimate_bandwidth_mode
+        if int(total_dram_bw) > 0:
+            self.dram_arbiter = DramArbiter(total_dram_bw)  # NOTE: Enforce total DRAM bandwidth cap
+        else:
+            self.dram_arbiter = None  # NOTE: No global DRAM bandwidth cap
 
         if self.estimate_bandwidth_mode:
             self.ifmap_buf = rdbuf_est()
@@ -135,6 +142,10 @@ class double_buffered_scratchpad:
                 self.ifmap_port.def_params(config = self.config, latency_file=ifmap_dram_trace)
                 self.filter_port.def_params(config = self.config, latency_file=filter_dram_trace)
                 self.ofmap_port.def_params(config=self.config, latency_file=ofmap_dram_trace)
+            if self.dram_arbiter is not None:
+                self.ifmap_port.set_arbiter(self.dram_arbiter, port_name="ifmap")  # NOTE: Share global DRAM arbiter
+                self.filter_port.set_arbiter(self.dram_arbiter, port_name="filter")  # NOTE: Share global DRAM arbiter
+                self.ofmap_port.set_arbiter(self.dram_arbiter, port_name="ofmap")  # NOTE: Share global DRAM arbiter
 
             self.ifmap_buf.set_params(backing_buf_obj=self.ifmap_port,
                                       total_size_bytes=ifmap_buf_size_bytes,
@@ -474,6 +485,22 @@ class double_buffered_scratchpad:
         """
         assert self.traces_valid, 'Traces not generated yet'
         return self.total_cycles
+
+    def get_dram_arbiter_trace(self):
+        """
+        Method to get the DRAM arbiter trace if enabled.
+        """
+        if self.dram_arbiter is None:
+            return []
+        return self.dram_arbiter.get_trace_records()  # NOTE: Return per-request arbitration trace
+
+    def get_dram_arbiter_summary(self):
+        """
+        Method to get DRAM arbiter summary statistics if enabled.
+        """
+        if self.dram_arbiter is None:
+            return {}
+        return self.dram_arbiter.get_summary()  # NOTE: Return grouped arbitration summary
 
     #
     def get_stall_cycles(self):

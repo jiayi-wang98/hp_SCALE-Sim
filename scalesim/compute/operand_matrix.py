@@ -95,14 +95,7 @@ class operand_matrix(object):
         #if len(layer_hyper_param_arr) == 8:
         #    self.col_stride = layer_hyper_param_arr[7]
 
-        # TODO: Anand
-        # TODO: Next release
-        # TODO: Add an option for batching
         self.batch_size = 1
-
-        # TODO: Marked for cleanup
-        #if len(layer_hyper_param_arr) == 9:
-        #    self.batch_size = layer_hyper_param_arr[8]
 
         # Assign the calculated hyper parameters
         self.ofmap_rows, self.ofmap_cols = self.topoutil.get_layer_ofmap_dims(self.layer_id)

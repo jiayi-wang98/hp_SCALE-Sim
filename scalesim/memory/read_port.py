@@ -4,6 +4,7 @@ External DRAM read requests serviced by Ramulator
 import numpy as np
 from scalesim.scale_config import scale_config as config
 from bisect import bisect_left
+from scalesim.memory.dram_arbiter import DramArbiter
 
 class read_port:
     """
@@ -24,6 +25,8 @@ class read_port:
         self.request_array = []
         self.count = 0
         self.config = config()
+        self.arbiter = None  # NOTE: Optional global DRAM arbiter
+        self.port_name = "unknown"  # NOTE: Port identifier for arbitration logs
     #
     def def_params( self,
                     config = config(),
@@ -42,6 +45,13 @@ class read_port:
             #print(f"Latency file is {latency_file}")
         self.stall_cycles=0
         self.latency = 1
+
+    def set_arbiter(self, arbiter, port_name="unknown"):
+        """
+        Method to attach a global DRAM arbiter.
+        """
+        self.arbiter = arbiter  # NOTE: Shared arbiter enforces total DRAM bandwidth
+        self.port_name = str(port_name)  # NOTE: Tag requests with a human-readable source name
         
     def set_params(self, latency):
         """
@@ -71,7 +81,7 @@ class read_port:
 
     # The incoming read requests will be needed when the capability of port is expanded
     # At the moment its kept for compatibility
-    def service_reads(self, incoming_requests_arr_np, incoming_cycles_arr):
+    def service_reads(self, incoming_requests_arr_np, incoming_cycles_arr, use_arbiter=True):
         """
         Method to service read request by the read buffer.
         Check for hit in the request queue or add the DRAM
@@ -79,6 +89,13 @@ class read_port:
         Ramulator.
         """
         if self.ramulator_trace is False:
+            if use_arbiter and self.arbiter is not None and isinstance(self.arbiter, DramArbiter):
+                arrival_cycles = [int(x[0]) for x in incoming_cycles_arr]
+                request_sizes = [int(np.sum(row != -1)) for row in incoming_requests_arr_np]
+                priorities = [0 for _ in arrival_cycles]  # NOTE: Reads are higher priority
+                sources = [self.port_name for _ in arrival_cycles]  # NOTE: Tag source for trace logging
+                out_cycles = self.arbiter.service_requests(arrival_cycles, request_sizes, extra_latency=self.latency, priorities=priorities, sources=sources)
+                return np.asarray(out_cycles).reshape((len(out_cycles), 1))  # NOTE: FCFS DRAM arbitration
             out_cycles_arr = incoming_cycles_arr + self.latency
             return out_cycles_arr
 

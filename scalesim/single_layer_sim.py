@@ -374,6 +374,7 @@ class single_layer_sim:
                     ifmap_backing_buf_bw=ifmap_backing_bw,
                     filter_backing_buf_bw=filter_backing_bw,
                     ofmap_backing_buf_bw=ofmap_backing_bw,
+                    total_dram_bw=self.config.get_total_dram_bandwidth(),  # NOTE: Global DRAM bandwidth cap
                     verbose=self.verbose,
                     ifmap_sram_bank_num=self.config.ifmap_sram_bank_num,
                     ifmap_sram_bank_port=self.config.ifmap_sram_bank_port,
@@ -417,6 +418,7 @@ class single_layer_sim:
         ifmap_dram_filename = dir_name +  '/IFMAP_DRAM_TRACE.csv'
         filter_dram_filename = dir_name + '/FILTER_DRAM_TRACE.csv'
         ofmap_dram_filename = dir_name +  '/OFMAP_DRAM_TRACE.csv'
+        dram_arb_filename = dir_name + '/DRAM_ARB_TRACE.csv'  # NOTE: Global DRAM arbitration trace
 
         self.memory_system.print_ifmap_sram_trace(ifmap_sram_filename)
         self.memory_system.print_ifmap_dram_trace(ifmap_dram_filename)
@@ -424,6 +426,20 @@ class single_layer_sim:
         self.memory_system.print_filter_dram_trace(filter_dram_filename)
         self.memory_system.print_ofmap_sram_trace(ofmap_sram_filename)
         self.memory_system.print_ofmap_dram_trace(ofmap_dram_filename)
+        self.save_dram_arb_trace(dram_arb_filename)  # NOTE: Save DRAM arbiter trace if available
+
+    def save_dram_arb_trace(self, filename):
+        """
+        Method to save DRAM arbitration trace if enabled.
+        """
+        trace = self.memory_system.get_dram_arbiter_trace()
+        if not trace:
+            return
+        header = 'Source, ArrivalCycle, StartCycle, EndCycle, RequestWords, WaitCycles, Priority\n'
+        with open(filename, 'w') as f:
+            f.write(header)
+            for row in trace:
+                f.write(', '.join([str(x) for x in row]) + '\n')
 
     #
     def calc_report_data(self):
@@ -529,6 +545,21 @@ class single_layer_sim:
         items += [self.avg_ifmap_dram_bw, self.avg_filter_dram_bw, self.avg_ofmap_dram_bw]
 
         return items
+
+    def get_dram_arbiter_summary_rows(self):
+        """
+        Method to return DRAM arbiter summary rows for this layer.
+        """
+        summary = self.memory_system.get_dram_arbiter_summary()
+        rows = []
+        for src, stats in summary.items():
+            reqs = stats.get("requests", 0)
+            total_words = stats.get("total_words", 0)
+            total_wait = stats.get("total_wait", 0)
+            max_wait = stats.get("max_wait", 0)
+            avg_wait = float(total_wait) / float(reqs) if reqs > 0 else 0.0
+            rows.append([self.layer_id, src, reqs, total_words, total_wait, avg_wait, max_wait])
+        return rows  # NOTE: Layer-scoped DRAM arbitration summary
 
     #
     def get_detail_report_items(self):

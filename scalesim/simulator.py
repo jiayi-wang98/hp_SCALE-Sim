@@ -240,6 +240,17 @@ class simulator:
         if self.conf.sparsity_support is True:
             sparse_report.close()
 
+        dram_arb_summary_name = self.top_path + '/DRAM_ARB_SUMMARY.csv'
+        dram_arb_summary = open(dram_arb_summary_name, 'w')
+        header = ('LayerID, Source, Requests, TotalWords, TotalWaitCycles, '
+                  'AvgWaitCycles, MaxWaitCycles,\n')
+        dram_arb_summary.write(header)
+        for single_layer_obj in self.single_layer_sim_object_list:
+            rows = single_layer_obj.get_dram_arbiter_summary_rows()
+            for row in rows:
+                dram_arb_summary.write(', '.join([str(x) for x in row]) + '\n')
+        dram_arb_summary.close()  # NOTE: Global DRAM arbitration summary
+
     #
     def get_total_cycles(self):
         """

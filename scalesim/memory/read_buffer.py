@@ -416,7 +416,8 @@ class read_buffer:
         # 3. Send the request and get the response cycles count
         response_cycles_arr = \
             self.backing_buffer.service_reads(incoming_cycles_arr=cycles_arr,
-                                              incoming_requests_arr_np=prefetch_requests)
+                                              incoming_requests_arr_np=prefetch_requests,
+                                              use_arbiter=False)  # NOTE: Skip global arbiter during prefetch
 
         # 4. Update the variables
         #self.last_prefetch_cycle = int(response_cycles_arr[-1][0])
@@ -511,7 +512,8 @@ class read_buffer:
         # 4. Send the request
         response_cycles_arr = \
             self.backing_buffer.service_reads(incoming_cycles_arr=cycles_arr,
-                                              incoming_requests_arr_np=prefetch_requests)
+                                              incoming_requests_arr_np=prefetch_requests,
+                                              use_arbiter=False)  # NOTE: Skip global arbiter during prefetch
 
         # 5. Update the variables
         self.last_prefetch_cycle = np.amax(response_cycles_arr)
