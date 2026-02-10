@@ -61,6 +61,8 @@ class read_buffer:
         self.trace_valid = False
         self.use_ramulator_trace = False
         self.enable_layout_evaluation = False
+        # Dedup mode for prefetch stream: 'sliding' (capacity-aware) or 'global' (unique once)
+        self.dedup_mode = 'sliding'
 
     #
     def set_params(self, backing_buf_obj,
@@ -97,6 +99,16 @@ class read_buffer:
 
         # Ramulator trace
         self.use_ramulator_trace = use_ramulator_trace
+
+    def set_dedup_mode(self, mode='sliding'):
+        """
+        Set prefetch dedup mode.
+        'sliding' keeps a moving window of recent elements (SRAM-like).
+        'global' keeps only first occurrence (perfect reuse within the layer).
+        """
+        if mode not in ('sliding', 'global'):
+            raise ValueError(f"Unsupported dedup mode: {mode}")
+        self.dedup_mode = mode
 
     #
     def reset(self): # TODO: check if all resets are working propoerly
@@ -149,21 +161,46 @@ class read_buffer:
         # The operand matrix determines what to pre-fetch into both active and prefetch buffers
         # In 'user' mode, this will be set in the set_params
 
-        num_elems = fetch_matrix_np.shape[0] * fetch_matrix_np.shape[1]
+        # Flatten the operand fetches and perform capacity-aware deduplication.
+        # This models SRAM-side reuse: if an element is already within the active
+        # buffer window, it should not be re-fetched from DRAM.
+        flat = fetch_matrix_np.reshape(-1)
+        flat = flat[flat != -1]
+
+        # Active buffer capacity (in elements)
+        window_elems = max(1, int(self.active_buf_size))
+        dedup = []
+        if self.dedup_mode == 'global':
+            seen = set()
+            for elem in flat:
+                if elem in seen:
+                    continue
+                dedup.append(elem)
+                seen.add(elem)
+        else:
+            # Sliding window of recent elements (approximate SRAM contents)
+            # Use deque to avoid O(n) pop(0) for large windows.
+            from collections import deque
+            recent = deque()
+            recent_set = set()
+            for elem in flat:
+                if elem in recent_set:
+                    continue
+                dedup.append(elem)
+                recent.append(elem)
+                recent_set.add(elem)
+                if len(recent) > window_elems:
+                    old = recent.popleft()
+                    recent_set.discard(old)
+
+        num_elems = len(dedup)
         num_lines = int(math.ceil(num_elems / self.req_gen_bandwidth))
         self.fetch_matrix = np.ones((num_lines, self.req_gen_bandwidth)) * -1
 
-        # Put stuff into the fetch matrix
-        # This is done to ensure that there is no shape mismatch
-        # Not sure if this is the optimal way to do it or not
-        for i in range(num_elems):
-            src_row = math.floor(i / fetch_matrix_np.shape[1])
-            src_col = math.floor(i % fetch_matrix_np.shape[1])
-
-            dest_row = math.floor(i / self.req_gen_bandwidth)
-            dest_col = math.floor(i % self.req_gen_bandwidth)
-
-            self.fetch_matrix[dest_row][dest_col] = fetch_matrix_np[src_row][src_col]
+        for i, elem in enumerate(dedup):
+            dest_row = i // self.req_gen_bandwidth
+            dest_col = i % self.req_gen_bandwidth
+            self.fetch_matrix[dest_row][dest_col] = elem
 
         # Once the fetch matrices are set, populate the data structure for faster lookups and
         # servicing
@@ -417,7 +454,7 @@ class read_buffer:
         response_cycles_arr = \
             self.backing_buffer.service_reads(incoming_cycles_arr=cycles_arr,
                                               incoming_requests_arr_np=prefetch_requests,
-                                              use_arbiter=False)  # NOTE: Skip global arbiter during prefetch
+                                              use_arbiter=True)  # NOTE: Enforce global arbiter during prefetch
 
         # 4. Update the variables
         #self.last_prefetch_cycle = int(response_cycles_arr[-1][0])
@@ -513,7 +550,7 @@ class read_buffer:
         response_cycles_arr = \
             self.backing_buffer.service_reads(incoming_cycles_arr=cycles_arr,
                                               incoming_requests_arr_np=prefetch_requests,
-                                              use_arbiter=False)  # NOTE: Skip global arbiter during prefetch
+                                              use_arbiter=True)  # NOTE: Enforce global arbiter during prefetch
 
         # 5. Update the variables
         self.last_prefetch_cycle = np.amax(response_cycles_arr)

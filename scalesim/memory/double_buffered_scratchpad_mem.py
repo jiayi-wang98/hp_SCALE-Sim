@@ -79,6 +79,7 @@ class double_buffered_scratchpad:
 
         self.using_ifmap_custom_layout = False
         self.using_filter_custom_layout = False
+        self.dataflow = ''
 
     #
     def set_params(self,
@@ -101,6 +102,8 @@ class double_buffered_scratchpad:
         self.layer_id = layer_id
         self.topo = topo
         self.config = config
+        dataflow = self.config.get_dataflow()
+        self.dataflow = dataflow
         self.use_ramulator_trace = config.get_ramulator_trace()
 
         self.estimate_bandwidth_mode = estimate_bandwidth_mode
@@ -168,6 +171,9 @@ class double_buffered_scratchpad:
                                        enable_layout_evaluation=using_filter_custom_layout,
                                        use_ramulator_trace=self.use_ramulator_trace
                                        )
+            # For OS piped / OS SA interleaving, use global dedup to model SRAM reuse
+            if dataflow in ('os_piped', 'os_piped_f2', 'os_piped_f4', 'os_sa', 'os_sa_f2', 'os_sa_f4'):
+                self.filter_buf.set_dedup_mode('global')
 
         self.ofmap_buf.set_params(backing_buf_obj=self.ofmap_port,
                                   total_size_bytes=ofmap_buf_size_bytes,
@@ -180,6 +186,9 @@ class double_buffered_scratchpad:
         self.using_ifmap_custom_layout = using_ifmap_custom_layout  
         self.using_filter_custom_layout = using_filter_custom_layout  
         self.params_valid_flag = True
+        if self.verbose:
+            print(f"[DBG mem] dataflow={self.dataflow}")
+
 
 
     #

@@ -73,62 +73,68 @@ class systolic_compute_os_sa_f2:
         """
 
         self.config = config_obj
+        self.arr_row, self.arr_col = self.config.get_array_dims()
 
-
-        # --- START: Modified for Pipelined 3-Cycle MAC Interleaving ---
-        # The goal is to interleave 3 rows of IFMAP into the time dimension (columns)
-        # to hide the 3-cycle MAC latency.
-        
-        # 1. Handle IFMAP: Interleave 3 sub-matrices
+        # mod global-fold-interleaving
         M, K = ifmap_op_mat.shape
+        N = ofmap_op_mat.shape[1]
         
-        # Pad M (rows) if not divisible by 3 to ensure we can split evenly
-        remainder = M % skew_factor
-        if remainder != 0:
-            pad_rows = skew_factor - remainder
-            padding = np.zeros((pad_rows, K))
-            ifmap_op_mat = np.vstack((ifmap_op_mat, padding))
-
-            # Also pad OFMAP to maintain consistent row count
-            padding_ofmap = np.zeros((pad_rows, ofmap_op_mat.shape[1]))
-            ofmap_op_mat = np.vstack((ofmap_op_mat, padding_ofmap))    
-
-            # If we pad IFMAP, we must logically consider OFMAP padded too for dimension consistency
-            # though we will resize OFMAP below anyway.
-            M += pad_rows
-
-        # Reshape to separate the groups: (M/3, 3, K)
-        # Dimension 0: The new reduced spatial rows
-        # Dimension 1: The 3 interleaved batches
-        # Dimension 2: The original time/reduction dimension
-        ifmap_reshaped = ifmap_op_mat.reshape(M // skew_factor, skew_factor, K)
+        F_M = math.ceil(M / self.arr_row)
+        F_N = math.ceil(N / self.arr_col)
         
-        # Permute to (M/3, K, 3) to put the interleaved batches adjacent to each other
-        ifmap_permuted = ifmap_reshaped.transpose(0, 2, 1)
+        target_M = F_M * self.arr_row
+        target_N = F_N * self.arr_col
         
-        # Flatten the last two dimensions to create the new interleaved time dimension
-        # New shape: (M/3, 3*K)
-        # The sequence in columns will be: [K0_Mat0, K0_Mat1, K0_Mat2, K1_Mat0, K1_Mat1, K1_Mat2...]
-        self.ifmap_op_mat = ifmap_permuted.reshape(M // skew_factor, -1)
-
-        # 2. Handle Filter: Repeat weights to match the interleaved input
-        # Original: (K, N). Target: (3*K, N)
-        # We repeat each row 3 times: [W0, W0, W0, W1, W1, W1...]
-        self.filter_op_mat = np.repeat(filter_op_mat, skew_factor, axis=0)
-
-        # 3. Handle OFMAP: Adjust spatial dimension
-        # Original: (M, N). Target: (M/3, N)
-        # We need to keep the full OFMAP for correct demand generation (draining 3x data),
-        # but the simulator's structural parameters (Sr) are based on the reduced physical rows.
-        self.ofmap_op_mat_full = ofmap_op_mat
-        self.ofmap_op_mat = ofmap_op_mat[:(M // skew_factor), :]
+        # Padding
+        if target_M > M:
+            ifmap_op_mat = np.vstack((ifmap_op_mat, np.zeros((target_M - M, K))))
+        if target_N > N:
+            filter_op_mat = np.hstack((filter_op_mat, np.zeros((K, target_N - N))))
         
-        # self.ifmap_op_mat = ifmap_op_mat
-        # self.filter_op_mat = filter_op_mat
-        # self.ofmap_op_mat = ofmap_op_mat
+        new_ofmap = np.zeros((target_M, target_N))
+        new_ofmap[:M, :N] = ofmap_op_mat
+        ofmap_op_mat = new_ofmap
 
-        # --- END: Modified for Pipelined 3-Cycle MAC Interleaving ---
+        # Prepare fold pairs
+        fold_pairs = []
+        for fc_idx in range(F_N):
+            for fr_idx in range(F_M):
+                fold_pairs.append((fr_idx, fc_idx))
+        
+        num_logical_folds = len(fold_pairs)
+        num_physical_passes = math.ceil(num_logical_folds / skew_factor)
+        
+        while len(fold_pairs) < num_physical_passes * skew_factor:
+            fold_pairs.append((-1, -1))
+            
+        # Construct unrolled and interleaved matrices
+        self.ifmap_op_mat = np.full((num_physical_passes * self.arr_row, K * skew_factor), -1.0)
+        self.filter_op_mat = np.full((K * skew_factor, num_physical_passes * self.arr_col), -1.0)
+        self.ofmap_op_mat_full = np.full((num_physical_passes * self.arr_row * skew_factor, self.arr_col), -1.0)
+        
+        self.fold_pairs = fold_pairs # for compute util accuracy
+        self.orig_K = K
 
+        for p in range(num_physical_passes):
+            for s in range(skew_factor):
+                fr, fc = fold_pairs[p * skew_factor + s]
+                if fr == -1: continue
+                
+                # IFMAP block
+                i_start, i_end = fr * self.arr_row, (fr + 1) * self.arr_row
+                self.ifmap_op_mat[p*self.arr_row : (p+1)*self.arr_row, s::skew_factor] = ifmap_op_mat[i_start:i_end, :]
+                
+                # Filter block
+                f_start, f_end = fc * self.arr_col, (fc + 1) * self.arr_col
+                self.filter_op_mat[s::skew_factor, p*self.arr_col : (p+1)*self.arr_col] = filter_op_mat[:, f_start:f_end]
+                
+                # OFMAP blocks (stored for sequential draining)
+                o_block = ofmap_op_mat[i_start:i_end, f_start:f_end]
+                for r in range(self.arr_row):
+                    self.ofmap_op_mat_full[p * self.arr_row * skew_factor + r * skew_factor + s, :] = o_block[r, :]
+
+        self.ofmap_op_mat = ofmap_op_mat[:self.ifmap_op_mat.shape[0], :self.arr_col]
+        
         ifmap_col = self.ifmap_op_mat.shape[1]
         filter_row= self.filter_op_mat.shape[0]
 
@@ -139,10 +145,9 @@ class systolic_compute_os_sa_f2:
         self.Sc = self.filter_op_mat.shape[1]
         self.T = self.ifmap_op_mat.shape[1]
 
-        self.arr_row, self.arr_col = self.config.get_array_dims()
-
-        self.row_fold = math.ceil(self.Sr / self.arr_row)
-        self.col_fold = math.ceil(self.Sc / self.arr_col)
+        self.row_fold = num_physical_passes
+        self.col_fold = 1
+        # mod end
 
         self.params_set_flag = True
 
@@ -230,9 +235,11 @@ class systolic_compute_os_sa_f2:
         """
         assert self.params_set_flag, 'Parameters are not set'
 
-        for fc in range(self.col_fold):
+        # mod for unrolled prefetch
+        for fc in range(self.row_fold):
             col_start_id = fc * self.arr_col
-            col_end_id = min(col_start_id + self.arr_col, self.Sc)
+            col_end_id = col_start_id + self.arr_col
+            # mod end
 
             delta = self.arr_col - (col_end_id - col_start_id)
 
@@ -424,8 +431,10 @@ class systolic_compute_os_sa_f2:
 
         for fc in range(self.col_fold):
             for fr in range(self.row_fold):
-                col_start_id = fc * self.arr_col
-                col_end_idx = min(col_start_id + self.arr_col, self.Sc)
+                # mod for unrolled filter
+                col_start_id = fr * self.arr_col
+                col_end_idx = col_start_id + self.arr_col
+                # mod end
                 delta = self.arr_col - (col_end_idx - col_start_id)
 
                 this_fold_demand = self.filter_op_mat[:, col_start_id: col_end_idx]
@@ -497,9 +506,11 @@ class systolic_compute_os_sa_f2:
                 row_end_idx = min(row_start_id + self.arr_row, self.Sr)
                 row_delta = self.arr_row - (row_end_idx - row_start_id)
 
-                col_start_id = fc * self.arr_col
-                col_end_idx = min(col_start_id + self.arr_col, self.Sc)
-                col_delta = self.arr_col - (col_end_idx - col_start_id)
+                # mod for unrolled ofmap
+                col_start_id = 0
+                col_end_idx = self.arr_col
+                col_delta = 0 
+                # mod end
 
                 # --- START: Modified for 3-Cycle Output ---
                 # We need to extract the full 3x rows corresponding to these physical rows
@@ -568,17 +579,20 @@ class systolic_compute_os_sa_f2:
 
                 # Calculate the mapping efficiency
                 row_used = min(self.arr_row, row_end_idx - row_start_id)
-                col_used = min(self.arr_col, col_end_idx - col_start_id)
+                col_used = self.arr_col 
                 mac_used = row_used * col_used
                 mapping_eff_this_fold = mac_used / (self.arr_row * self.arr_col)
 
                 cycles_this_fold = this_fold_demand.shape[0] + this_fold_demand.shape[1] - 1
-                # need to check
-                # mod for overlap
-                # if not (fr == 0 and fc == 0):
-                #    cycles_this_fold += inter_fold_gap_prefix
+                
+                # mod accuracy
+                valid_folds = 0
+                for s_idx in range(skew_factor):
+                    if self.fold_pairs[fr * skew_factor + s_idx][0] != -1:
+                        valid_folds += 1
+                compute_cycles_this_fold = mac_used * self.orig_K * valid_folds
                 # mod end
-                compute_cycles_this_fold = mac_used * self.T
+                
                 compute_util_this_fold = \
                     compute_cycles_this_fold / (self.arr_row * self.arr_col * cycles_this_fold)
 
@@ -703,13 +717,14 @@ class systolic_compute_os_sa_f2:
         """
         assert self.demand_mat_ready_flag, 'Computes not ready yet'
 
-        # mod start compute util
+        # mod start compute util accuracy
         if self.total_cycles is not None:
-            total_compute_cycles = self.Sr * self.Sc * self.T
+            valid_fold_count = sum(1 for pair in self.fold_pairs if pair[0] != -1)
+            total_compute_cycles = valid_fold_count * self.arr_row * self.arr_col * self.orig_K
             avg_compute_util = \
                 total_compute_cycles / (self.arr_row * self.arr_col * self.total_cycles)
             return avg_compute_util
-        # mod end compute util
+        # mod end compute util accuracy
 
         agg = sum(self.compute_utility_per_fold)
         num = len(self.compute_utility_per_fold)

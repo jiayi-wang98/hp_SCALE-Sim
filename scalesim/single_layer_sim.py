@@ -490,7 +490,14 @@ class single_layer_sim:
         self.ofmap_dram_start_cycle, self.ofmap_dram_stop_cycle, self.ofmap_dram_writes \
             = self.memory_system.get_ofmap_dram_details()
         
-        self.overall_cycles = int(self.ofmap_dram_stop_cycle - min(self.ifmap_dram_start_cycle,self.filter_dram_start_cycle))
+        # Use SRAM request start (actual demand launch) to avoid counting early DRAM prefetch
+        # This preserves the demand schedule while still accounting for DRAM drain on ofmap
+        min_start = min(self.ifmap_sram_start_cycle,
+                        self.filter_sram_start_cycle,
+                        self.ofmap_sram_start_cycle)
+        if min_start < 0:
+            min_start = 0
+        self.overall_cycles = int(self.ofmap_dram_stop_cycle - min_start)
         
         # BW calc for DRAM access
         self.avg_ifmap_dram_bw = self.ifmap_dram_reads / \
