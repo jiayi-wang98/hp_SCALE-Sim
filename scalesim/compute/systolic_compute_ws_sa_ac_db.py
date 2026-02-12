@@ -60,6 +60,7 @@ class systolic_compute_ws_sa_ac_db:
 
         self.mapping_efficiency_per_fold = []
         self.compute_utility_per_fold = []
+        self.total_cycles = None
 
         # Flags
         self.params_set_flag = False
@@ -639,10 +640,15 @@ class systolic_compute_ws_sa_ac_db:
 
     #
     def get_avg_compute_utilization(self):
-        """
-        Method to get average compute utilization on the systolic array.
-        """
-        assert self.demand_mat_ready_flag, 'Computes not ready yet'
+        assert self.demand_mat_ready_flag, "Computes not ready yet"
+
+        # mod start compute util
+        if self.total_cycles is not None:
+            total_compute_cycles = self.Sr * self.Sc * self.T
+            avg_compute_util = \
+                total_compute_cycles / (self.arr_row * self.arr_col * self.total_cycles)
+            return avg_compute_util
+        # mod end compute util
 
         agg = sum(self.compute_utility_per_fold)
         num = len(self.compute_utility_per_fold)
@@ -650,6 +656,11 @@ class systolic_compute_ws_sa_ac_db:
         avg_compute_util = agg / num
 
         return avg_compute_util
+
+    # mod start compute util
+    def set_total_cycles(self, total_cycles):
+        self.total_cycles = total_cycles
+    # mod end compute util
 
     #
     def get_ifmap_requests(self):

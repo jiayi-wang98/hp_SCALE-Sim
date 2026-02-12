@@ -494,8 +494,13 @@ class systolic_compute_os_sa:
     def get_avg_compute_utilization(self):
         assert self.demand_mat_ready_flag, 'Computes not ready yet'
         if self.total_cycles is not None:
-            total_compute_cycles = self.Sr * self.Sc * self.T # Simplified for unrolled
-            return total_compute_cycles / (self.arr_row * self.arr_col * self.total_cycles)
+            # mod start compute util accuracy
+            valid_fold_count = sum(1 for pair in self.fold_pairs if pair[0] != -1)
+            total_compute_cycles = valid_fold_count * self.arr_row * self.arr_col * self.orig_K
+            avg_compute_util = \
+                total_compute_cycles / (self.arr_row * self.arr_col * self.total_cycles)
+            return avg_compute_util
+            # mod end compute util accuracy
         agg = sum(self.compute_utility_per_fold)
         num = len(self.compute_utility_per_fold)
         return agg / num
